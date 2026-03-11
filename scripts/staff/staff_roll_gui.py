@@ -604,46 +604,56 @@ class StaffRollSim:
         if cmd.end_flag:
             self.done_flag = True
 
+        # 打印当前指令的详细 Log
+        log_msg = f"[CMD {self.cmd_index}] "
+        
         w_left = 0
         w_right = 0
 
+        # 处理左侧行
         if cmd.row_left != -1:
+            hpt_idx, div_idx = self.assets._row_map.get(cmd.row_left, (None, None))
+            log_msg += f"Left: RowID {cmd.row_left} (HPT {hpt_idx:02d}, Div {div_idx}) | "
+            
             img_l, w_l, h_l = self.assets.photo(cmd.row_left, 1.0, self.root)
             if img_l is not None and w_l > 0:
                 w_left = w_l
                 a = cmd.align
-                if a == 0:
-                    x = 240 - w_l
-                elif a == 1:
-                    x = 224 - w_l
-                elif a == 2:
-                    x = 10
-                elif a == 3:
-                    x = 248
-                elif a == 4:
-                    x = (240 - w_l) if cmd.row_right != -1 else 0x4000
-                elif a == 5:
-                    x = (224 - w_l) if cmd.row_right != -1 else 0x4000
-                elif a == 6:
-                    x = (288 - w_l) if cmd.row_right != -1 else 0x4000
-                else:
-                    x = 0x4000
+                # 坐标计算逻辑保持不变...
+                if a == 0: x = 240 - w_l
+                elif a == 1: x = 224 - w_l
+                elif a == 2: x = 10
+                elif a == 3: x = 248
+                elif a == 4: x = (240 - w_l) if cmd.row_right != -1 else 240 - w_l/2
+                elif a == 5: x = (224 - w_l) if cmd.row_right != -1 else 224 - w_l/2
+                elif a == 6: x = (288 - w_l) if cmd.row_right != -1 else 288 - w_l/2
+                else: x = 0x4000
                 self._spawn_sprite(cmd.row_left, float(x), float(SPAWN_Y))
+        else:
+            log_msg += "Left: Empty | "
 
+        # 处理右侧行
         if cmd.row_right != -1:
+            hpt_idx, div_idx = self.assets._row_map.get(cmd.row_right, (None, None))
+            log_msg += f"Right: RowID {cmd.row_right} (HPT {hpt_idx:02d}, Div {div_idx}) | "
+            
             img_r, w_r, h_r = self.assets.photo(cmd.row_right, 1.0, self.root)
             if img_r is not None and w_r > 0:
                 w_right = w_r
                 a = cmd.align
-                if a == 5:
-                    x = 256
-                elif a == 6:
-                    x = 304
-                else:
-                    x = 248
+                if a == 5: x = 256
+                elif a == 6: x = 304
+                else: x = 248
                 self._spawn_sprite(cmd.row_right, float(x), float(SPAWN_Y))
+        else:
+            log_msg += "Right: Empty | "
 
+        # 处理分隔符
         if cmd.has_separator:
+            divider_row_id = self.assets.separator_row_id if self.assets.separator_row_id is not None else 155
+            hpt_idx, div_idx = self.assets._row_map.get(divider_row_id, (None, None))
+            log_msg += f"SEP: ACTIVE (HPT {hpt_idx:02d}, Div {div_idx})"
+            
             a = cmd.align
             v23 = 0
             if a in (0, 3):
@@ -654,13 +664,18 @@ class StaffRollSim:
                 v23 = (w_left + w_right + 32) if cmd.row_right != -1 else (w_left // 2) + 32
             elif a == 5:
                 v23 = (w_left + w_right + 48) if cmd.row_right != -1 else (w_left // 2) + 32
+            
             if v23 > 0:
-                divider_row_id = self.assets.separator_row_id if self.assets.separator_row_id is not None else 155
                 divider_asset = self.assets.row_asset(divider_row_id)
                 if divider_asset.w > 0:
                     scale_x = (2.0 * float(v23)) / float(divider_asset.w)
                     self._spawn_sprite(divider_row_id, float(240 - v23), float(SPAWN_Y + 24.0), scale_x=scale_x)
+        else:
+            log_msg += "SEP: None"
 
+        # 输出这一行指令的完整映射关系
+        print(log_msg)
+        
         self.scroll_accum += float(cmd.pixel_gap)
 
     def _update_info(self):
