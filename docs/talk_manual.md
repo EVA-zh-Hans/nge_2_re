@@ -28,11 +28,20 @@
         2. `timePhrase`
         3. `verbSjis`
         4. `placePhrase`
-        5. `maskAText`（仅在 `maskA` 不包含 `styleBit` 时输出，否则为空）
-        <!-- TODO：这个 styleBit 指的是什么？ -->
+        5. `maskAText`（仅在 `maskA` 不包含 `speakerBit` 时输出，否则为空）
         6. `"が"`（仅在输出了 `maskAText` 时输出，否则为空）
         7. `maskBText`
         8. `expanded`
+
+这个为空可以看下面这个例子：
+
+```
+speaker=真嗣, maskA=真嗣, maskB=明日香, template=2
+=> 碇真嗣回想起今早在 NERV 食堂向明日香搭话的事。
+
+speaker=真嗣, maskA=绫波, maskB=明日香, template=2
+=> 碇真嗣回想起今早在 NERV 食堂绫波向明日香搭话的事。
+```
 
 > ```text
 > $aは%s、
@@ -393,3 +402,33 @@ templateId 899/900/901: "和{B}闲聊"
 
 最终句子替换 sub_890F080；菜单摘要另替换 sub_890F6B8 或 sub_890F410；不要动 sub_890F2C4，也不要把 sub_890FA58
 当主战场。
+
+# 翻译方案
+
+首先解决模板的问题。现有的模板包括：
+
+```
+maskB + に...
+maskB + を...
+maskB + の...
+maskB + から...
+maskB + と...
+```
+
+举例：
+| 模板 | 角色 |
+|---|---|
+| {B}に話した | 说话对象 |
+| {B}を無視した | 直接受事 |
+| {B}の態度 | 所属者 |
+| {B}から離れた | 来源/远离对象 |
+| {B}と勉強した | 共同行动者 |
+| {B}への視線を逸らしたこと | 视线转移对象 |
+
+分类：
+- 交谈类（B_NI）：{B}に話した
+- 关系类（B_WO）：{B}を無視した
+- 属性类（B_NO）：{B}の態度
+- 视线类（B_EYELID）：{B}への視線を逸らしたこと
+- 其他类（B_KARA/TO）：{B}から離れた、{B}と勉強した
+- NO_B：没有 {B} 的模板，一人で悩んだ
