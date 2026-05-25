@@ -31,20 +31,17 @@ extern ActionTemplatePair off_8A4B45C[0x6D6];
 
 ```c
 typedef struct ActionRecord {
-  u32 unk0;
-  u32 maskA;       // 用于 $a
-  u32 maskB;       // 用于 $b
-  u16 unkC;
-  u16 templateId;  // 索引 off_8A4B45C，范围 < 0x6D6
-  u16 unk10;
-  u16 sortKey;     // sub_890F2C4 用作排序键；0 表示跳过
+    uint32_t timestamp;   /* +0x00 */
+    uint32_t maskA;       /* +0x04, template-layer $a */
+    uint32_t maskB;       /* +0x08, template-layer $b */
+    uint8_t valid;        /* +0x0C */
+    uint8_t locationId;   /* +0x0D */
+    uint16_t templateId;  /* +0x0E  索引 off_8A4B45C，范围 < 0x6D6 */
+    uint8_t recordType;   /* +0x10 */
+    uint8_t unk11;        /* +0x11 */
+    uint16_t sortKey;     /* +0x12 sub_890F2C4 用作排序键；0 表示跳过 */
 } ActionRecord;
 ```
-
-其中字段命名依据：
-- `templateId`：`sub_890F2C4` / `sub_890FA58` 都读取 `+0x0E` 的 `u16` 来索引 `off_8A4B45C`
-- `sortKey`：`sub_890F2C4` 读取 `+0x12` 的 `u16`，为 0 时直接跳过；非 0 时作为 key 参与排序
-- `maskA/maskB`：`sub_890FA58` 传入模板展开函数，最终被 `$a/$b` 使用
 
 ## sub_890F2C4 行为（筛选 + 排序）
 
@@ -189,6 +186,10 @@ int __fastcall sub_890FA58(
   - `unkC` 的高字节：`locationId`（用于地点短语）
 
 ### Step 1：生成 expanded（模板展开结果）
+
+```C
+typedef int (*ExpandActionTemplateFn)(const MemTalkActionRecord *rec, char *outBuf, unsigned int outBufSize, char delimiter, int styleBit);
+```
 
 取模板：
 
@@ -569,3 +570,133 @@ token 处理的关键语义（根据 `sub_882EED4` 反编译）：
   - 遍历 `ctx->records`，把 `valid != 3` 的记录全部置无效（`valid=0`），只保留 `valid==3` 的记录
 
 因此：即便某些组合“曾经被写入”，也可能在这条恢复/过滤路径上被直接清掉，最终你在候选列表/渲染侧就再也看不到它。  
+
+MemTalk_ExpandActionTemplate 不是“整句生成器”，它只做一件事：按
+  rec->templateId 取事件模板的两段文本，然后把模板内部的 $a/$b 展开成 maskA/
+  maskB 的人物短语。
+
+  签名大致是：
+
+  int MemTalk_ExpandActionTemplate(
+      const ActionRecord *rec,
+      char *outBuf,
+      unsigned int outBufSize,
+      char delimiter,
+      char styleBit
+  );
+
+  行为流程：
+
+  memset(outBuf, 0, outBufSize);
+
+  entry = templateTable[rec->templateId]; // 每项是 {prefix, suffix}
+
+  n = AppendExpandedTemplate(
+      outBuf,
+      entry.prefix,
+      outBufSize,
+      rec->maskA,
+      rec->maskB,
+      styleBit
+  );
+
+  if (entry.suffix[0] != '\0') {
+      if (delimiter != 0)
+          outBuf[n++] = delimiter;
+
+      n += AppendExpandedTemplate(
+          outBuf + n,
+          entry.suffix,
+          outBufSize - n,
+          rec->maskA,
+          rec->maskB,
+          styleBit
+      );
+  }
+
+  outBuf[n] = '\0';
+  return n + 1; // 含末尾 NUL
+
+  模板表 stru_8A4B45C 的结构是：
+
+  struct {
+      const char *prefix;
+      const char *suffix;
+  } templates[0x6D6];
+
+  例如你刚才的 templateId=901：
+
+  prefix = "に、たわいもない話を"
+  suffix = "したこと"
+
+  在最终句里调用时：
+
+  MemTalk_ExpandActionTemplate(rec, outBuf, 0x46, '\n', speakerBit);
+
+  所以结果是：
+
+  に、たわいもない話を
+  したこと
+
+  如果是菜单摘要调用，delimiter=0，结果就会变成：
+
+  に、たわいもない話をしたこと
+
+  AppendExpandedTemplate 的展开规则很简单：
+
+  - 普通 ASCII 字节：原样复制。
+  - Shift-JIS 高位字节：按双字节复制，避免把日文第二字节误判成 $。
+  - 遇到 $：读取下一个字符作为占位符。
+  - $a：调用 MemTalk_FormatCharacterMask(rec->maskA, styleBit, dst)。
+  - $b：调用 MemTalk_FormatCharacterMask(rec->maskB, styleBit, dst)。
+  - 其他 $x：不输出任何东西。
+
+  这里要特别区分两种 $a/$b：
+
+  模板内部的 $a/$b
+  => ExpandActionTemplate 立刻替换成 maskA/maskB 人名短语。
+
+  最终显示字符串里的 $a/$b/$n
+  => 留给 sub_882FD7C 文本引擎处理，表示说话者、目标、换行等。
+
+  MemTalk_FormatCharacterMask 的规则是：
+
+  mask 为空或只有 bit0        => 空字符串
+  mask 包含 styleBit          => "自分"
+  mask 不含 styleBit          => 取第一个置位角色名
+  mask 还有其他置位角色       => 追加 "たち"
+
+  所以在你的样本里：
+
+  styleBit = speakerBit = 2
+  maskA = 00010000 => ペンペン
+  maskB = 00000004 => 自分
+
+  然后外层 MemTalk_ShowMemorySentence 再把它组合成：
+
+  {place}{maskA}{が}{maskB}{expanded}を。
+
+  代入后就是：
+
+  マンションのリビングでペンペンが
+  自分に、たわいもない話を
+  したことを。
+
+  对汉化最重要的结论是：ExpandActionTemplate 产物通常不是完整中文事件，而是日语
+  谓语尾巴，往往期待外层先拼上 maskB：
+
+  maskB + "に、たわいもない話を\nしたこと"
+  maskB + "を無視したこと"
+  maskB + "の態度にヘコんだこと"
+  maskB + "からの誘いを\n拒絶したこと"
+
+  所以它很适合用来“研究原始模板语法”，但不适合直接作为中文最终拼接方案。中文应该
+  把 templateId 对应成完整事件模板，比如：
+
+  901:
+  日语展开: {B}に、たわいもない話を / したこと
+  中文模板: 和{B}闲聊
+
+  然后外层再生成：
+
+  {speaker}回想起一小时前在公寓客厅里，PenPen和自己闲聊的事。

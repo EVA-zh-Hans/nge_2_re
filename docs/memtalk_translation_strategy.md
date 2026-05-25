@@ -114,6 +114,57 @@ rec != NULL && (rec->maskA & rec->maskB & 0xFFFFFF) == 0
 碇真嗣向明日香认真回想起昨天在学校教室里绫波拒绝自己的邀请的事。
 ```
 
+实测样本：`templateId=901`
+
+日志关键字段：
+
+```text
+speakerBit=2
+targetBit=0
+verb=思い出した
+maskA=00010000 => ペンペン
+maskB=00000004 => 自分
+timePhrase=１時間前
+placePhrase=マンションのリビングで
+templateId=901
+expanded=に、たわいもない話を / したこと
+```
+
+原始日语 detail 拼接结果：
+
+```text
+$aは、
+１時間前の出来事を思い出した。$nマンションのリビングでペンペンが
+自分に、たわいもない話を
+したことを。
+```
+
+把换行和日语名词化还原后是：
+
+```text
+$a は 1 小时前在公寓客厅里，ペンペンが自分にたわいもない話をしたこと を思い出した。
+```
+
+中文不要照搬成“自己に、……したことを”。推荐把 `に、たわいもない話を / したこと` 归入 `B_NI` 里的“说话/告知对象”子类，中文模板写成：
+
+```json
+{ "subject": "auto", "zh": "和{B}闲聊", "summary": "和{B}闲聊" }
+```
+
+这一条完整渲染建议：
+
+```text
+{speaker}回想起一小时前在公寓客厅里，PenPen和自己闲聊的事。
+```
+
+如果想更贴近原文方向性，也可以写成：
+
+```text
+{speaker}回想起一小时前在公寓客厅里，PenPen对自己说了些无关紧要的话。
+```
+
+但作为通用模板，`和{B}闲聊` 更适合多数角色组合，也能避免 `{A}对自己说...` 这种中文里略显僵硬的表达。
+
 ### 3. 尾句
 
 触发条件：
@@ -263,6 +314,7 @@ maskB=0
 {B}に話題を振ったこと
 {B}に近づいたこと
 {B}に警告したこと
+{B}に、たわいもない話を / したこと
 ```
 
 中文模板：
@@ -271,6 +323,7 @@ maskB=0
 { "subject": "auto", "zh": "向{B}搭话" }
 { "subject": "auto", "zh": "接近{B}" }
 { "subject": "auto", "zh": "警告{B}" }
+{ "subject": "auto", "zh": "和{B}闲聊" }
 ```
 
 完整例句：
@@ -278,7 +331,10 @@ maskB=0
 ```text
 碇真嗣回想起今早在 NERV 食堂向明日香搭话的事。
 碇真嗣回想起昨天在学校教室里绫波接近明日香的事。
+碇真嗣回想起一小时前在公寓客厅里PenPen和自己闲聊的事。
 ```
+
+注意：`B_NI` 不是都机械翻成“向{B}”。如果动作核心是 `話をした`、`相談した`、`話しかけた` 这类交谈行为，中文经常更自然地写作“和{B}闲聊/找{B}商量/和{B}搭话”。只有 `警告した`、`報告した`、`言った` 这类方向性强的动作，才优先用“向/对/给{B}...”。
 
 ### B. B を：对象是直接受事
 
@@ -540,3 +596,242 @@ templateId 有效模板表约 771 条
 ```
 
 不需要枚举所有 `speaker/target/time/place/mask/template` 的最终组合。
+
+## 逐模板处理工作表
+
+我把所有有效模板生成了一份工作表：
+
+- `docs/memtalk_template_translation_workbook.tsv`：适合用表格软件打开和批量筛选。
+- `docs/memtalk_templates_zh_draft.jsonc`：适合后续直接变成 patch 数据表；内容是标准 JSON，只是扩展名避开仓库的 `*.json` ignore。
+- 生成脚本：`scripts/memtalk_generate_translation_workbook.py`
+
+重新生成：
+
+```sh
+python3 scripts/memtalk_generate_translation_workbook.py
+```
+
+当前有效模板共 771 条，自动分类结果：
+
+| 分类 | 数量 | 处理核心 |
+|---|---:|---|
+| `B_NI` | 362 | `{B}に...`，按“向/对/给{B}...”处理 |
+| `B_NO` | 110 | `{B}の...`，按“{B}的...”或“因{B}...”处理 |
+| `NO_B` | 99 | 不依赖 `{B}`，只翻事件本身 |
+| `B_KARA` | 56 | `{B}から...`，按“从{B}/被{B}/因为{B}”择一 |
+| `B_KARA_NO` | 40 | `{B}からの...`，按“来自{B}的...”处理 |
+| `B_TO` | 30 | `{B}と...`，按“和{B}...”处理 |
+| `B_WO` | 29 | `{B}を...`，按直接宾语处理 |
+| `B_TO_NO` | 18 | `{B}との...`，按“和{B}的...”处理 |
+| `B_NI_TAISHITE` | 16 | `{B}に対して...`，按“对{B}...”处理 |
+| `INTERNAL_AB` | 8 | 模板内部含 `$a/$b`，必须手写 |
+| `B_HENO` | 3 | `{B}への...`，按“对{B}的/给{B}的...”处理 |
+
+工作表字段含义：
+
+| 字段 | 含义 |
+|---|---|
+| `id` | `templateId` |
+| `same_as_id` | 若该模板文本重复，可复用此 id 的译文 |
+| `duplicate_count` | 同一日文模板出现次数 |
+| `category` | 自动语法分类 |
+| `subject_policy` | 主语策略；目前大多是 `auto` |
+| `jp_prefix` | 原始 ActionTemplate 的 prefix |
+| `jp_suffix` | 原始 ActionTemplate 的 suffix |
+| `jp_with_b` | 若原模板依赖 `maskB`，补上 `{B}` 后的原始日语结构 |
+| `zh_prefix` | 中文 ActionTemplate 的 prefix |
+| `zh_suffix` | 中文 ActionTemplate 的 suffix |
+
+`zh_prefix` / `zh_suffix` 用统一的工作表占位符：
+
+```text
+{A} = rec->maskA 的参与者短语
+{B} = rec->maskB 的参与者短语
+```
+
+未知条目的中文列默认留空，不再把分类 rule 或机器 seed 混进译表。若中文最终只需要一段模板，可以把完整中文事件放在 `zh_prefix`，`zh_suffix` 留空。实际 patch 若复用原展开器，再把 `{A}` / `{B}` 映射为模板层 `$a` / `$b`。
+
+逐条校对时的推荐步骤：
+
+1. 先按 `same_as_id` 过滤重复项。重复模板直接复用 canonical id 的译文。
+2. 按 `category` 分批处理，不要按 id 顺序硬翻。
+3. 分别填写 `zh_prefix` / `zh_suffix`；要引用 ActionRecord 的参与者时用 `{A}` / `{B}`。
+4. 对有 `same_as_id` 的重复项，优先跟 canonical id 保持一致。
+5. 菜单摘要另做短译，不再塞进这个 ActionTemplate 译表。
+
+一个典型条目：
+
+```tsv
+id  category  jp_prefix             jp_suffix  zh_prefix   zh_suffix
+901 B_NI      に、たわいもない話を したこと    和{B}闲聊
+```
+
+渲染时先把 `{B}` 替换为 `maskB` 的参与者短语，再按 `subject_policy` 处理外层主语：
+
+```text
+碇真嗣回想起一小时前在公寓客厅里和明日香闲聊的事。
+碇真嗣回想起一小时前在公寓客厅里PenPen和自己闲聊的事。
+```
+
+这是一个 **PSP/日文游戏文本 Hook 的调试日志**，看起来是你装的 `MemTalkDebug` 在拦截“回忆/传闻/对话记录”类文本时打印出来的。
+
+核心结论：**Hook 成功了，而且它抓到了两种文本生成分支：simple 和 detail。**
+
+---
+
+## 它在干嘛
+
+第一行：
+
+```txt
+MemTalkDebug install:
+gameTextAddr=08804040
+addrMode=ida_absolute
+gameBaseDelta=00000000
+hook=0890F080
+replacement=08BEBF7C
+```
+
+意思是：
+
+* `gameTextAddr=08804040`：游戏文本相关函数或地址。
+* `hook=0890F080`：被 Hook 的原函数地址。
+* `replacement=08BEBF7C`：你的替换函数地址。
+* `addrMode=ida_absolute`：地址按 IDA 看到的绝对地址解释。
+* `gameBaseDelta=0`：当前运行地址和 IDA 地址没有偏移，说明地址基准大概率对上了。
+
+---
+
+## MemTalk #1：没有详细记录，走 simple 分支
+
+```txt
+rec: <null>
+branch: rec=no low24Overlap=00000001 => simple
+```
+
+这里 `rec` 是空的，所以没有查到详细记忆记录，于是走了 `simple` 模板。
+
+动词：
+
+```txt
+verbSjis hex=8E 76 82 A2 8F 6F 82 B5 82 BD
+```
+
+这串 Shift-JIS 解码后是：
+
+```txt
+思い出した
+```
+
+也就是“想起来了”。
+
+simple 模板大概是：
+
+```txt
+$aは、昔の出来事を%s。
+```
+
+填入 `%s = 思い出した` 后变成：
+
+```txt
+$aは、昔の出来事を思い出した。
+```
+
+其中 `$a` 应该是游戏自己的名字/角色 token，还没经过最终 token engine 解析。
+
+---
+
+## MemTalk #2：有记录，走 detail 分支
+
+```txt
+rec=08B7A014 ... valid=1 locationId=1 templateId=901 recordType=61
+branch: rec=yes low24Overlap=00000000 => detail
+```
+
+这次找到了记录 `rec`，而且 `valid=1`，所以走详细文本分支。
+
+它提取到的字段大概是：
+
+```txt
+timePhrase = １時間前
+placePhrase = マンションのリビングで
+maskAText = ペンペン
+maskBText = 自分
+verb = 思い出した
+```
+
+`detail.expanded` 这一段：
+
+```txt
+に、たわいもない話を
+したこと
+```
+
+大概是记录内容的后半句，意思类似：
+
+```txt
+和……聊了些无关紧要的话这件事
+```
+
+最终 `detail.buffer.beforeTokenEngine` 拼出来的大意是：
+
+```txt
+$aは、
+１時間前の出来事を思い出した。
+$nマンションのリビングでペンペンが
+自分に、たわいもない話を
+したことを。
+```
+
+自然中文大概是：
+
+```txt
+$a 想起了 1 小时前发生的事。
+在公寓客厅里，ペンペン 和自己聊了些无关紧要的话。
+```
+
+`$a`、`$n` 是游戏内部控制符：
+
+* `$a`：可能代表当前说话者/主语名字。
+* `$n`：可能代表换行或特殊格式控制。
+* 这些会在后面的 `TokenEngine` 里被替换/解释。
+
+---
+
+## 为什么 `.raw` 是乱码？
+
+比如：
+
+```txt
+verbSjis.raw="�v���o����"
+```
+
+这是因为日志查看器或打印函数把 **Shift-JIS 日文文本当成 UTF-8/ANSI 错误解码** 了。
+
+但 hex 是对的：
+
+```txt
+8E 76 82 A2 8F 6F 82 B5 82 BD
+```
+
+按 Shift-JIS 解码就是：
+
+```txt
+思い出した
+```
+
+所以不是文本坏了，是日志显示编码不对。
+
+---
+
+## 你这段日志说明什么？
+
+它说明：
+
+1. **Hook 已经进来了。**
+2. **文本地址和函数地址大概率正确。**
+3. **simple 分支能拼出基础句子。**
+4. **detail 分支能读到记忆记录 rec，并正确拼出时间、地点、人物、事件内容。**
+5. 当前最大问题不是 Hook，而是 **日志输出编码显示问题**，以及你可能还需要确认 `$a` / `$n` 这些 token 在最终显示前是否被正确交给原游戏文本引擎处理。
+
+如果你是在调翻译补丁或文本替换，这段日志整体是“好消息”：拦截点和结构解析基本是通的。
