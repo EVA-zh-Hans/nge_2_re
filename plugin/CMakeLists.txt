@@ -24,6 +24,8 @@ set(SOURCES
     src/sceLibFont.S
     src/scefttt.c
     src/psputil.c
+    src/fs.c
+    src/utils/utils.c
 )
 
 # Create PRX module with exports  

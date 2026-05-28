@@ -1,8 +1,5 @@
 #include <pspsdk.h>
-#include <stdlib.h>
 #include <stdarg.h>
-#include <string.h>
-#include <stdio.h>
 #include <pspkernel.h>
 #include <pspthreadman.h>
 #include <pspmodulemgr.h>
@@ -14,7 +11,6 @@
 #include <pspctrl.h>
 
 #include "patcher.h"
-#include "unifont.h"
 #include "ui_atlas.h"
 #include "image_display.h"
 

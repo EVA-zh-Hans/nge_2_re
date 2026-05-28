@@ -1,13 +1,20 @@
 #include <pspsdk.h>
 #include <pspkernel.h>
+#include <psptypes.h>
 
 #include "patcher.h"
-#include "psptypes.h"
-#include "transform.h"
+
+// Utils
+#include "utils.h"
 #include "log.h"
-#include "hook.h"
+
+// PSP SDK Patch
 #include "scefttt.h"
 #include "psputil.h"
+
+// Custom Patch
+#include "fs.h"
+#include "transform.h"
 
 /**
  * The full 32-bit jump address is formed by concatenating
@@ -257,24 +264,22 @@ void patch_function()
         }
         pspSdkEnableInterrupts(state);
     }
-}
 
-char *strcpy(char *dest, const char *src)
-{
-    char *ret = dest;
-    while ((*dest++ = *src++) != '\0')
-        ;
-    return ret;
-}
+    /* Filesystem Patch */
+    {
+        u32 state = pspSdkDisableInterrupts();
+        {
+            // jal init_file_handle_with_lbn_path
+            _sw(JAL_TO(init_file_handle_with_lbn_path), NEW_ADDR(0x8986f34)); // engineIoOpen
+            _sw(JAL_TO(init_file_handle_with_lbn_path), NEW_ADDR(0x8986ffc)); // engineIoOpenAync
 
-char *strcpyn(char *dest, const char *src, size_t n)
-{
-    char *ret = dest;
-    while (n-- && (*dest++ = *src++) != '\0')
-        ;
-    if (n > 0)
-        *dest = '\0'; // Null-terminate if there's space left
-    return ret;
+            // 089873E4                 jal     path_to_lbn
+            _sw(JAL_TO(path_to_lbn), NEW_ADDR(0x089873e4));
+            sceKernelDcacheWritebackAll();
+            sceKernelIcacheInvalidateAll();
+        }
+        pspSdkEnableInterrupts(state);
+    }
 }
 
 // TODO: Patch Using External JSON File
@@ -383,14 +388,14 @@ int patch_from_external_file(const char* filename) {
 
     SceUID fd = sceIoOpen(filename, PSP_O_RDONLY, 0777);
 
-    dbg_log("fd: %d", fd);
+    dbg_log("fd: %d\n", fd);
     
     err = sceIoRead(fd, &header.num, sizeof(u32));
     if(err < 0) {
         return err;
     }
 
-    dbg_log("Header Num: %d", header.num);
+    dbg_log("Header Num: %d\n", header.num);
     
     for(int i=0;i<header.num;++i) {
         err = sceIoRead(fd, &entry.offset, sizeof(u32));
@@ -408,8 +413,9 @@ int patch_from_external_file(const char* filename) {
             return err;
         }
 
-        dbg_log("Offset: %x, Buffer: %x, Size: %d", entry.offset, entry.buffer, entry.size);
+        dbg_log("Offset: %x, Buffer: %x, Size: %d\n", entry.offset, entry.buffer, entry.size);
         // Patch the BIN.
+        // TODO: Use memcpy instead of strcpy to avoid the Null Terminator Problem.
         strcpyn((char *)NEW_ADDR(entry.offset), entry.buffer, entry.size);
     }
 

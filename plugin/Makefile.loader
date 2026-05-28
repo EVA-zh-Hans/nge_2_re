@@ -3,8 +3,8 @@ ATTR = BIN
 
 OBJS = src/loader/loader.o src/loader/ui_draw.o src/loader/image_display.o\
  src/patcher.o src/transform.o\
- src/bin/gb2312.o src/bin/sjis.o src/bin/utf16.o src/utils/log.o src/bin/atlas.o src/bin/atlas_palette.o\
- src/sceLibFont.o src/scefttt.o src/psputil.o
+ src/bin/gb2312.o src/bin/sjis.o src/bin/utf16.o src/utils/log.o src/utils/utils.o src/bin/atlas.o src/bin/atlas_palette.o\
+ src/sceLibFont.o src/scefttt.o src/psputil.o src/fs.o
 
 CFLAGS = -O2 -Wall
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
