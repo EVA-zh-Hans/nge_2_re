@@ -13,6 +13,7 @@
 | <a href="https://forum.evageeks.org/thread/1393/Game-Neon-Genesis-Evangelion-2-Another-Cases/700/"><b>原帖</b></a> 
 | <a href="https://github.com/xeonliu/nge_2_re/discussions"><b>讨论区</b></a> 
 | <a href="https://github.com/xeonliu/nge_2_re/issues"><b>反馈问题</b></a> 
+| <a href="https://deepwiki.com/EVA-zh-Hans/nge_2_re"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
 |
 </p>
 
