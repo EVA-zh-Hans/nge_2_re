@@ -174,10 +174,10 @@ static int CnMemTalk_RenderEvaTemplatePiece(
         }
 
         /*
-         * Keep EVA SJIS bytes paired while scanning ASCII placeholders. The
-         * custom Chinese lead range and normal SJIS leads are both >= 0x80.
+         * Keep EVA SJIS bytes paired while scanning ASCII placeholders.
+         * Only treat known lead-byte ranges as 2-byte sequences.
          */
-        if (*p >= 0x80)
+        if ((*p >= 0xA6 && *p <= 0xDD) || (*p >= 0x81 && *p <= 0x9F) || (*p >= 0xE0 && *p <= 0xFC))
         {
             pos = CnMemTalk_AppendByte(out, outCap, pos, *p++);
             if (*p)
