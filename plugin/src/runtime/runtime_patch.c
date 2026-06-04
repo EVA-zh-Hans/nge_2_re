@@ -16,11 +16,12 @@ void MemTalkPatch_Install(u32 game_base);
 
 void RuntimePatch_InstallAll(u32 game_base, u32 flags)
 {
+    (void)ExternalTranslationPatch_Apply(game_base, "disc0:/PSP_GAME/USRDIR/EBTRANS.BIN");
+
     u32 state = pspSdkDisableInterrupts();
 
     TextEncodingPatch_Install(game_base);
     SentencePatch_Install(game_base);
-    ExternalTranslationPatch_Apply(game_base, "disc0:/PSP_GAME/USRDIR/EBTRANS.BIN");
     SaveDataPatch_Install(game_base);
     MessageDialogPatch_Install(game_base);
     FontPatch_Install(game_base);
