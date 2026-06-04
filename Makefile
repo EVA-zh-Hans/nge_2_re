@@ -134,6 +134,8 @@ plugin:
 	@mkdir -p $(EXPORT_SYSDIR)
 	@echo "Copying EBOOT.BIN to SYSDIR..."
 	@cp -r plugin/EBOOT.BIN $(EXPORT_SYSDIR)/EBOOT.BIN
+	@echo "Copying EVA2RT.PRX to SYSDIR..."
+	@cp -r plugin/EVA2RT.prx $(EXPORT_SYSDIR)/EVA2RT.PRX
 
 pgftool:
 	@echo "Building pgftool..."
