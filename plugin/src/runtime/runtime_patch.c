@@ -17,7 +17,6 @@ void RuntimePatch_InstallAll(u32 game_base, u32 flags)
 {
     TextEncodingPatch_Install(game_base);
     SentencePatch_Install(game_base);
-    ExternalTranslationPatch_Apply(game_base, "disc0:/PSP_GAME/USRDIR/EBTRANS.BIN");
     SaveDataPatch_Install(game_base);
     MessageDialogPatch_Install(game_base);
     FontPatch_Install(game_base);
