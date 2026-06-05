@@ -239,3 +239,13 @@ docker run -it --rm -v $(pwd):/app -w /app pspdev-dev
 * [PPSSPP](https://www.ppsspp.org/)
 * [PSPDev 工具链](https://pspdev.github.io/)
 * 全体参与汉化与校对的志愿者们 ❤️
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=EVA-zh-Hans%2Fnge_2_re&type=date&logscale=&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=EVA-zh-Hans/nge_2_re&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=EVA-zh-Hans/nge_2_re&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=EVA-zh-Hans/nge_2_re&type=date&legend=top-left" />
+ </picture>
+</a>
