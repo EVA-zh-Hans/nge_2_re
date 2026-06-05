@@ -1,5 +1,4 @@
 #include <pspkernel.h>
-#include <pspsdk.h>
 
 #include "hook_write.h"
 #include "runtime_args.h"
@@ -16,8 +15,6 @@ void MemTalkPatch_Install(u32 game_base);
 
 void RuntimePatch_InstallAll(u32 game_base, u32 flags)
 {
-    u32 state = pspSdkDisableInterrupts();
-
     TextEncodingPatch_Install(game_base);
     SentencePatch_Install(game_base);
     ExternalTranslationPatch_Apply(game_base, "disc0:/PSP_GAME/USRDIR/EBTRANS.BIN");
@@ -28,5 +25,4 @@ void RuntimePatch_InstallAll(u32 game_base, u32 flags)
     DebugPatch_Install(game_base, flags);
 
     HookWrite_FlushCaches();
-    pspSdkEnableInterrupts(state);
 }

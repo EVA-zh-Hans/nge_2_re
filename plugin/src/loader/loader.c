@@ -170,15 +170,8 @@ static int main_thread(SceSize args, void *argp)
 	endGu();
 
 	SceUID eboot_mid = sceKernelLoadModule(PathOldBoot, 0, NULL);
-	if (eboot_mid >= 0)
-	{
-		sceKernelStartModule(eboot_mid, 0, NULL, NULL, NULL);
-	}
-
-	sceKernelDelayThread(1000);
-
-    SceUID runtime_mid = sceKernelLoadModule(PathRuntime, 0, NULL);
-    if (runtime_mid >= 0) {
+	if (eboot_mid >= 0) {
+        SceUID runtime_mid = sceKernelLoadModule(PathRuntime, 0, NULL);
         Eva2RuntimeStartArgs runtime_args;
         runtime_args.boot_mid = eboot_mid;
         runtime_args.flags = 0;
@@ -191,7 +184,12 @@ static int main_thread(SceSize args, void *argp)
         if (enable_daily_debug) {
             runtime_args.flags |= EVA2_FLAG_DAILY_DEBUG;
         }
-        sceKernelStartModule(runtime_mid, sizeof(runtime_args), &runtime_args, NULL, NULL);
+
+        if (runtime_mid >= 0) {
+            sceKernelStartModule(runtime_mid, sizeof(runtime_args), &runtime_args, NULL, NULL);
+        }
+
+        sceKernelStartModule(eboot_mid, 0, NULL, NULL, NULL);
     }
 
 	return sceKernelExitDeleteThread(0);
