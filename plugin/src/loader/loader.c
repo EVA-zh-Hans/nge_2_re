@@ -13,7 +13,7 @@
 
 #include <pspctrl.h>
 
-#include "patcher.h"
+#include "runtime_args.h"
 #include "unifont.h"
 #include "ui_atlas.h"
 #include "image_display.h"
@@ -94,6 +94,7 @@ void drawRect(float x, float y, float w, float h) {
 
 
 #define PathOldBoot "disc0:/PSP_GAME/SYSDIR/BOOT.BIN"
+#define PathRuntime "disc0:/PSP_GAME/SYSDIR/EVA2RT.PRX"
 
 int selected_index = 0;
 int last_pad_buttons = 0;
@@ -169,30 +170,26 @@ static int main_thread(SceSize args, void *argp)
 	endGu();
 
 	SceUID eboot_mid = sceKernelLoadModule(PathOldBoot, 0, NULL);
-	if (eboot_mid >= 0)
-	{
-		sceKernelStartModule(eboot_mid, 0, NULL, NULL, NULL);
-	}
+	if (eboot_mid >= 0) {
+        SceUID runtime_mid = sceKernelLoadModule(PathRuntime, 0, NULL);
+        Eva2RuntimeStartArgs runtime_args;
+        runtime_args.boot_mid = eboot_mid;
+        runtime_args.flags = 0;
+        if (enable_pulse_autowin) {
+            runtime_args.flags |= EVA2_FLAG_PULSE_AUTOWIN;
+        }
+        if (enable_battle_debug) {
+            runtime_args.flags |= EVA2_FLAG_BATTLE_DEBUG;
+        }
+        if (enable_daily_debug) {
+            runtime_args.flags |= EVA2_FLAG_DAILY_DEBUG;
+        }
 
-	sceKernelDelayThread(1000);
-	
-	// USER_MAIN Thread Will Only Last for a fraction of second.
-	SceKernelModuleInfo info;
-	sceKernelQueryModuleInfo(eboot_mid, &info);
-	u32 base_addr = info.segmentaddr[0];
+        if (runtime_mid >= 0) {
+            sceKernelStartModule(runtime_mid, sizeof(runtime_args), &runtime_args, NULL, NULL);
+        }
 
-	patch(base_addr);
-
-    if (enable_pulse_autowin) {
-        patchPulseAutowin();
-    }
-
-    if (enable_battle_debug) {
-        patchBattleDebugMenu();
-    }
-
-    if (enable_daily_debug) {
-        patchDailyDebugMenu();
+        sceKernelStartModule(eboot_mid, 0, NULL, NULL, NULL);
     }
 
 	return sceKernelExitDeleteThread(0);

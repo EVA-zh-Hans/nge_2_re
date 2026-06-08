@@ -21,12 +21,16 @@ ATLAS_HEADER := include/atlas_data.h
 release: generate-assets
 	make -f Makefile.loader
 	mv EBOOT.prx EBOOT.BIN
+	make -f Makefile.runtime
 debug: generate-assets
 	make -f Makefile.loader DEBUG=1
 	mv EBOOT.prx EBOOT.BIN
+	make -f Makefile.runtime DEBUG=1
 clean: 
 	make -f Makefile.loader clean
+	make -f Makefile.runtime clean
 	rm -f EBOOT.BIN
+	rm -f EVA2RT.prx
 	rm -rf $(GENERATED_DIR)
 cmake:
 	cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_TOOLCHAIN_FILE=$PSPDEV/psp/share/pspdev.cmake -B build .
