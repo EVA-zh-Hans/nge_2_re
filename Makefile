@@ -35,6 +35,7 @@ help:
 	@echo "  make init_db             - Initialize the database"
 	@echo "  make import_all          - Import all assets (hgar, text, bind)"
 	@echo "  make download_trans      - Download translations from ParaTranz"
+	@echo "  make generate_memtalk_templates - Generate Runtime MemTalk C templates"
 	@echo "  make import_trans        - Import downloaded translations to DB"
 	@echo "  make export_all          - Export all game files (text, hgar, eboot)"
 	@echo "  make gen_metadata        - Generate patch metadata (JSON and image)"
@@ -81,13 +82,19 @@ download_trans:
 	$(UV_RUN) -m scripts.paratranz.download --action download --dest_folder $(DOWNLOAD_DIR)
 	$(UV_RUN) -m scripts.paratranz.download --action merge --dest_folder $(DOWNLOAD_DIR)
 
+generate_memtalk_templates:
+	@echo "Generating MemTalk Runtime templates..."
+	$(UV_RUN) -m scripts.memtalk.memtalk_generate_c_templates \
+		--input '$(DOWNLOAD_DIR)/utf8/memtalk.json' \
+		--output 'plugin/src/runtime/patches/memtalk/memtalk_templates.c'
+
 # TODO: Add specific check targets if needed, or group them here
 check_trans:
 	@echo "Checking translations..."
 	$(UV_RUN) -m scripts.check '$(DOWNLOAD_DIR)/evs_trans.json' $(BUILD_DIR)/evs_report.json evs
 	# ... (Add other checks here if needed)
 
-import_trans:
+import_trans: generate_memtalk_templates
 	@echo "Importing translations..."
 	$(PYTHON_MAIN) --import_translation '$(DOWNLOAD_DIR)/evs_trans.json'
 	$(PYTHON_MAIN) --import_translation '$(DOWNLOAD_DIR)/utf8/free/info.json'
@@ -235,7 +242,7 @@ clean:
 
 # Mark targets as PHONY (not real files)
 .PHONY: help init_db import_hgar import_text import_bind import_images import_all \
-        download_trans check_trans import_trans \
+        download_trans generate_memtalk_templates check_trans import_trans \
         export_text export_bind export_hgar export_eboot_trans export_all \
         plugin pgftool pspdecrypt \
         extract_iso decrypt_eboot copy_font repack_iso gen_xdelta gen_metadata patch_iso \
