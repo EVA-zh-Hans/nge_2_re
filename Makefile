@@ -36,6 +36,9 @@ help:
 	@echo "  make import_all          - Import all assets (hgar, text, bind)"
 	@echo "  make download_trans      - Download translations from ParaTranz"
 	@echo "  make generate_memtalk_templates - Generate Runtime MemTalk C templates"
+	@echo "  make generate_staff_roll - Generate translated Staff Roll assets"
+	@echo "  make preview_staff_roll  - Generate and open the Staff Roll PNG preview"
+	@echo "  make inject_staff_roll   - Inject staff21.hpt into exported staff.har"
 	@echo "  make import_trans        - Import downloaded translations to DB"
 	@echo "  make export_all          - Export all game files (text, hgar, eboot)"
 	@echo "  make gen_metadata        - Generate patch metadata (JSON and image)"
@@ -124,18 +127,37 @@ export_hgar:
 	@echo "Generating hgar..."
 	$(PYTHON_MAIN) --output_hgar $(EXPORT_USRDIR)
 
+generate_staff_roll:
+	@echo "Generating translated Staff Roll..."
+	$(UV_RUN) scripts/staff/generate_staff_roll.py
+
+preview_staff_roll: generate_staff_roll
+	@echo "Opening $(BUILD_DIR)/generated/staff_roll/staff21.png..."
+	@if command -v open >/dev/null 2>&1; then \
+		open $(BUILD_DIR)/generated/staff_roll/staff21.png; \
+	elif command -v xdg-open >/dev/null 2>&1; then \
+		xdg-open $(BUILD_DIR)/generated/staff_roll/staff21.png; \
+	else \
+		echo "Preview: $(BUILD_DIR)/generated/staff_roll/staff21.png"; \
+	fi
+
+inject_staff_roll: export_hgar generate_staff_roll
+	@echo "Injecting translated Staff Roll..."
+	$(UV_RUN) scripts/staff/generate_staff_roll.py \
+		--inject-har $(EXPORT_USRDIR)/game/staff.har
+
 export_eboot_trans:
 	@echo "Generating EBOOT translation binary..."
 	@mkdir -p $(EXPORT_BIN_DIR)
 	$(UV_RUN) -m app.elf_patch.patcher -t $(DOWNLOAD_DIR)/eboot_trans.json -o $(EXPORT_BIN_DIR)/EBTRANS.BIN
 
-export_all: export_text export_bind export_hgar export_eboot_trans
+export_all: export_text export_bind inject_staff_roll export_eboot_trans
 
 # ==========================================
 # Tools & Plugins Build
 # ==========================================
 
-plugin:
+plugin: generate_staff_roll
 	@echo "Building plugin..."
 	$(MAKE) -C plugin
 	@mkdir -p $(EXPORT_SYSDIR)
@@ -238,6 +260,8 @@ clean:
 	rm -rf $(BUILD_DIR)
 	# Optional: Clean plugin and tools
 	# $(MAKE) -C plugin clean
+
+.PHONY: generate_staff_roll preview_staff_roll inject_staff_roll
 	# $(MAKE) -C third_party/pspdecrypt clean
 
 # Mark targets as PHONY (not real files)
