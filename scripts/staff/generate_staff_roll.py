@@ -44,6 +44,7 @@ ORIGINAL_COMMAND_COUNT = 196
 ORIGINAL_INSERT_INDEX = 189
 MAX_EXTRA_COMMANDS = 60
 ALPHA_GAMMA = 0.65
+PALETTE_ALPHA_EXPONENT = 0.45
 WHITE_BLEND_START = 176
 
 CTRL_PAGE_BREAK = 0x00001088
@@ -243,15 +244,14 @@ def build_atlas(
     ]
 
     palette_colors = [(0, 0, 0, 0)]  # index 0: transparent
-    for idx in range(1, 128):
-        palette_colors.append((CORE_R, CORE_G, CORE_B, idx * 2))
-    palette_colors.append((CORE_R, CORE_G, CORE_B, 255))
-    for idx in range(129, 256):
-        blend = max(0.0, (idx - WHITE_BLEND_START) / (255 - WHITE_BLEND_START))
+    for idx in range(1, 256):
+        alpha = round(255 * ((idx / 255) ** PALETTE_ALPHA_EXPONENT))
+        t = max(0.0, (idx - WHITE_BLEND_START) / (255 - WHITE_BLEND_START))
+        blend = t * t * (3 - 2 * t)
         r = int(CORE_R + (255 - CORE_R) * blend)
         g = int(CORE_G + (255 - CORE_G) * blend)
         b = int(CORE_B + (255 - CORE_B) * blend)
-        palette_colors.append((r, g, b, 255))
+        palette_colors.append((r, g, b, alpha))
 
     header = HgptHeader()
     header.has_extended_header = True

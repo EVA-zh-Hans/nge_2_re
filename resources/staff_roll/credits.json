@@ -1,10 +1,66 @@
 {
-  "font_size": 24,
+  "font_size": 22,
   "sections": [
     {
       "title": "汉化制作",
       "names": [
         "EVA2 汉化计划"
+      ]
+    },
+    {
+      "title": "统筹",
+      "names": [
+        "main_void",
+        "hanDragon20"
+      ]
+    },
+    {
+      "title": "翻译",
+      "names": [
+        "pan1927412",
+        "hanDragon20",
+        "Frykte",
+        "Liana384",
+        "Belfraw",
+        "Tianying.exe",
+        "カロモリモキナエ",
+        "Asuka",
+        "mel",
+        "Laolv000",
+        "zxlraw",
+        "yokuse"
+      ]
+    },
+    {
+      "title": "校对",
+      "names": [
+        "hanDragon20",
+        "Frykte",
+        "Belfraw",
+        "カロモリモキナエ",
+        "Asuka",
+        "mel",
+        "Laolv000"
+      ]
+    },
+    {
+      "title": "程序",
+      "names": [
+        "main_void"
+      ]
+    },
+    {
+      "title": "美工",
+      "names": [
+        "main_void",
+        "Belfraw"
+      ]
+    },
+    {
+      "title": "特别鸣谢",
+      "names": [
+        "EVA2 汉化计划全体成员",
+        "所有支持和帮助过我们的人"
       ]
     }
   ]
