@@ -43,13 +43,15 @@ EXTRA_ROW_BASE = 214
 ORIGINAL_COMMAND_COUNT = 196
 ORIGINAL_INSERT_INDEX = 189
 MAX_EXTRA_COMMANDS = 60
+ALPHA_GAMMA = 0.65
+WHITE_BLEND_START = 176
 
 CTRL_PAGE_BREAK = 0x00001088
 
 CTRL_TITLE = 0x00100208
 CTRL_PAIR = 0x0000020A
 CTRL_CENTERED = 0x00000208
-CTRL_SECTION_GAP = 0x00000100
+CTRL_SECTION_GAP = 0x00000108
 
 HGAR_ENCODED_IDENTIFIER = 0x90697026
 HGAR_DECODED_IDENTIFIER = 111
@@ -70,7 +72,7 @@ class RenderedEntry:
 
 def load_manifest(path: Path) -> tuple[int, list[CreditSection]]:
     data = json.loads(path.read_text(encoding="utf-8"))
-    font_size = int(data.get("font_size", 24))
+    font_size = int(data.get("font_size", 22))
     if font_size <= 0:
         raise ValueError("font_size must be positive")
 
@@ -105,8 +107,8 @@ def _draw_text_with_glow(
         return
     temp = Image.new("L", image.size, 0)
     draw = ImageDraw.Draw(temp)
-    draw.text((x, y), text, font=font, fill=200)
-    glow = temp.filter(ImageFilter.GaussianBlur(radius=3.0))
+    draw.text((x, y), text, font=font, fill=240)
+    glow = temp.filter(ImageFilter.GaussianBlur(radius=1.8))
     draw_glow = ImageDraw.Draw(glow)
     draw_glow.text((x, y), text, font=font, fill=255)
     image.paste(ImageChops.lighter(image, glow))
@@ -172,6 +174,7 @@ def build_atlas(
         commands.append((CTRL_TITLE, next_row_id, -1))
         next_row_id += 1
         physical_row += 1
+        commands.append((CTRL_SECTION_GAP, -1, -1))
 
         for name_index in range(0, len(section.names), 2):
             left_name = section.names[name_index]
@@ -227,23 +230,24 @@ def build_atlas(
     if len(commands) > MAX_EXTRA_COMMANDS:
         raise ValueError(f"too many generated commands: {len(commands)}>{MAX_EXTRA_COMMANDS}")
 
-    # Blue glow palette matching the original game's color scheme.
-    # Core text: RGB(0, 19, 255) — deep blue with full alpha.
-    # Glow halo: same blue hue, lower alpha creates the spread effect.
+    # The original staff roll keeps the glow and most glyph pixels deep blue,
+    # then transitions only the brightest pixels toward a white core.
     CORE_R, CORE_G, CORE_B = 0, 19, 255
 
     alpha_values = alpha_image.tobytes()
-    content = [0 if alpha == 0 else 1 + (alpha >> 1) for alpha in alpha_values]
+    content = [
+        0
+        if alpha == 0
+        else min(255, round(255 * ((alpha / 255) ** ALPHA_GAMMA)))
+        for alpha in alpha_values
+    ]
 
     palette_colors = [(0, 0, 0, 0)]  # index 0: transparent
-    # Indices 1-127: blue at increasing alpha (glow halo → core)
     for idx in range(1, 128):
         palette_colors.append((CORE_R, CORE_G, CORE_B, idx * 2))
-    # Index 128: full-core blue at alpha 255
     palette_colors.append((CORE_R, CORE_G, CORE_B, 255))
-    # Indices 129-255: gradually blend from core blue toward white
     for idx in range(129, 256):
-        blend = (idx - 128) / 128.0
+        blend = max(0.0, (idx - WHITE_BLEND_START) / (255 - WHITE_BLEND_START))
         r = int(CORE_R + (255 - CORE_R) * blend)
         g = int(CORE_G + (255 - CORE_G) * blend)
         b = int(CORE_B + (255 - CORE_B) * blend)
@@ -258,7 +262,9 @@ def build_atlas(
         palette=Palette(palette_colors),
         division_info=DivisionInfo(ATLAS_NAME, divisions),
     )
-    return image, alpha_image, commands, entries
+    preview = Image.new("RGBA", (ATLAS_WIDTH, ATLAS_HEIGHT))
+    preview.putdata([palette_colors[index] for index in content])
+    return image, preview, commands, entries
 
 
 def render_header(
@@ -413,12 +419,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--font",
         type=Path,
-        default=ROOT / "plugin" / "assets" / "fonts" / "ChillRoundFBold.ttf",
+        default=ROOT / "resources" / "assets" / "font" / "SourceHanSerifSC-Heavy.otf",
     )
     parser.add_argument(
         "--title-font",
         type=Path,
-        default=ROOT / "resources" / "assets" / "font" / "SourceHanSerifSC-Heavy.otf",
+        default=ROOT / "resources" / "assets" / "font" / "SourceHanSansSC-Regular.otf",
     )
     parser.add_argument(
         "--output-dir",
