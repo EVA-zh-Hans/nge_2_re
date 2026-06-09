@@ -9,7 +9,7 @@ import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageChops
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -43,6 +43,8 @@ EXTRA_ROW_BASE = 214
 ORIGINAL_COMMAND_COUNT = 196
 ORIGINAL_INSERT_INDEX = 189
 MAX_EXTRA_COMMANDS = 60
+
+CTRL_PAGE_BREAK = 0x00001088
 
 CTRL_TITLE = 0x00100208
 CTRL_PAIR = 0x0000020A
@@ -91,6 +93,25 @@ def text_bounds(font: ImageFont.FreeTypeFont, text: str) -> tuple[int, int, int,
     return ImageDraw.Draw(Image.new("L", (1, 1))).textbbox((0, 0), text, font=font)
 
 
+def _draw_text_with_glow(
+    image: Image.Image,
+    font: ImageFont.FreeTypeFont,
+    text: str,
+    x: int,
+    y: int,
+) -> None:
+    """Draw text with a glow effect by blurring and re-rendering the sharp core."""
+    if not text.strip():
+        return
+    temp = Image.new("L", image.size, 0)
+    draw = ImageDraw.Draw(temp)
+    draw.text((x, y), text, font=font, fill=200)
+    glow = temp.filter(ImageFilter.GaussianBlur(radius=3.0))
+    draw_glow = ImageDraw.Draw(glow)
+    draw_glow.text((x, y), text, font=font, fill=255)
+    image.paste(ImageChops.lighter(image, glow))
+
+
 def place_text(
     image: Image.Image,
     font: ImageFont.FreeTypeFont,
@@ -110,7 +131,7 @@ def place_text(
     x = left + (available - width) // 2 - bbox[0]
     row_top = physical_row * PHYSICAL_ROW_HEIGHT
     y = row_top + (PHYSICAL_ROW_HEIGHT - height) // 2 - bbox[1]
-    ImageDraw.Draw(image).text((x, y), text, font=font, fill=255)
+    _draw_text_with_glow(image, font, text, x, y)
 
     division_left = x + bbox[0]
     division = (division_left, row_top, width, PHYSICAL_ROW_HEIGHT)
@@ -120,16 +141,20 @@ def place_text(
 
 def build_atlas(
     font_path: Path,
+    title_font_path: Path,
     font_size: int,
     sections: list[CreditSection],
 ) -> tuple[HgptImage, Image.Image, list[tuple[int, int, int]], list[RenderedEntry]]:
     font = ImageFont.truetype(str(font_path), font_size)
+    title_font = ImageFont.truetype(str(title_font_path), font_size)
     alpha_image = Image.new("L", (ATLAS_WIDTH, ATLAS_HEIGHT), 0)
     divisions = [(0, 0, ATLAS_WIDTH, ATLAS_HEIGHT)]
     commands: list[tuple[int, int, int]] = []
     entries: list[RenderedEntry] = []
     physical_row = 0
     next_row_id = EXTRA_ROW_BASE
+
+    commands.append((CTRL_PAGE_BREAK, -1, -1))
 
     for section_index, section in enumerate(sections):
         needed_rows = 1 + (len(section.names) + 1) // 2
@@ -140,7 +165,7 @@ def build_atlas(
             )
 
         entry, division = place_text(
-            alpha_image, font, section.title, physical_row, TITLE_REGION, next_row_id
+            alpha_image, title_font, section.title, physical_row, TITLE_REGION, next_row_id
         )
         entries.append(entry)
         divisions.append(division)
@@ -202,14 +227,27 @@ def build_atlas(
     if len(commands) > MAX_EXTRA_COMMANDS:
         raise ValueError(f"too many generated commands: {len(commands)}>{MAX_EXTRA_COMMANDS}")
 
+    # Blue glow palette matching the original game's color scheme.
+    # Core text: RGB(0, 19, 255) — deep blue with full alpha.
+    # Glow halo: same blue hue, lower alpha creates the spread effect.
+    CORE_R, CORE_G, CORE_B = 0, 19, 255
+
     alpha_values = alpha_image.tobytes()
     content = [0 if alpha == 0 else 1 + (alpha >> 1) for alpha in alpha_values]
-    palette_colors = [(0, 0, 0, 0)]
-    palette_colors.extend(
-        (255, 255, 255, 255 if index == 128 else index * 2)
-        for index in range(1, 129)
-    )
-    palette_colors.extend([(255, 255, 255, 255)] * (256 - len(palette_colors)))
+
+    palette_colors = [(0, 0, 0, 0)]  # index 0: transparent
+    # Indices 1-127: blue at increasing alpha (glow halo → core)
+    for idx in range(1, 128):
+        palette_colors.append((CORE_R, CORE_G, CORE_B, idx * 2))
+    # Index 128: full-core blue at alpha 255
+    palette_colors.append((CORE_R, CORE_G, CORE_B, 255))
+    # Indices 129-255: gradually blend from core blue toward white
+    for idx in range(129, 256):
+        blend = (idx - 128) / 128.0
+        r = int(CORE_R + (255 - CORE_R) * blend)
+        g = int(CORE_G + (255 - CORE_G) * blend)
+        b = int(CORE_B + (255 - CORE_B) * blend)
+        palette_colors.append((r, g, b, 255))
 
     header = HgptHeader()
     header.has_extended_header = True
@@ -319,12 +357,13 @@ def inject_hgar(har_path: Path, hgpt_data: bytes) -> None:
 def write_outputs(
     manifest_path: Path,
     font_path: Path,
+    title_font_path: Path,
     output_dir: Path,
     header_path: Path,
     inject_path: Path | None,
 ) -> None:
     font_size, sections = load_manifest(manifest_path)
-    image, preview, commands, entries = build_atlas(font_path, font_size, sections)
+    image, preview, commands, entries = build_atlas(font_path, title_font_path, font_size, sections)
     output_dir.mkdir(parents=True, exist_ok=True)
     header_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -377,6 +416,11 @@ def parse_args() -> argparse.Namespace:
         default=ROOT / "plugin" / "assets" / "fonts" / "ChillRoundFBold.ttf",
     )
     parser.add_argument(
+        "--title-font",
+        type=Path,
+        default=ROOT / "resources" / "assets" / "font" / "SourceHanSerifSC-Heavy.otf",
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default=ROOT / "build" / "generated" / "staff_roll",
@@ -395,6 +439,7 @@ def main() -> None:
     write_outputs(
         manifest_path=args.manifest,
         font_path=args.font,
+        title_font_path=args.title_font,
         output_dir=args.output_dir,
         header_path=args.header,
         inject_path=args.inject_har,
