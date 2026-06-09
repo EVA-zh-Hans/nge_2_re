@@ -173,6 +173,39 @@ class HGArchive(object):
             # file.number = number
             number += 1
 
+    def build_v3_name_hash_table(self):
+        if self.version != 3:
+            return []
+
+        slot_count = 2 * self.get_total_files()
+        slots = [(0, 0xFFFF)] * slot_count
+        long_name_offset = 0
+
+        for file in self.files:
+            long_name = file.long_name
+            if isinstance(long_name, str):
+                long_name = long_name.encode('ascii')
+            if not long_name:
+                raise ValueError('HGAR v3 files require a long name')
+
+            name = long_name.rstrip(b'\0')
+            name_hash = (sum(name) + 101 * len(name)) & 0xFFFF
+            slot_index = name_hash % slot_count
+
+            for _ in range(slot_count):
+                if slots[slot_index][1] == 0xFFFF:
+                    slots[slot_index] = (name_hash, long_name_offset)
+                    break
+                slot_index = (slot_index + 1) % slot_count
+            else:
+                raise ValueError('HGAR v3 name hash table is full')
+
+            long_name_offset += 4 + len(long_name)
+            if long_name_offset > 0xFFFF:
+                raise ValueError('HGAR v3 long-name table exceeds 65535 bytes')
+
+        return slots
+
     def info(self):
         print('Version: %s' % self.version)
         print('Number of Files: %s' % len(self.files))
@@ -335,15 +368,23 @@ class HGArchive(object):
                 file_offset += common.calculate_word_aligned_length(file.size)
 
             if self.version == 3:
-                # Write unknowns
-                for file in self.files:
-                    common.write_uint32(f, file.unknown_first)
-                    common.write_uint32(f, file.unknown_last)
+                # This area is a global 2*N-slot name hash table, not two
+                # independent metadata fields attached to each file.
+                name_hash_slots = self.build_v3_name_hash_table()
+                for slot_index in range(0, len(name_hash_slots), 2):
+                    for name_hash, long_name_offset in name_hash_slots[
+                        slot_index:slot_index + 2
+                    ]:
+                        common.write_uint16(f, name_hash)
+                        common.write_uint16(f, long_name_offset)
 
                 # Write long names
                 for number, file in enumerate(self.files):
                     common.write_uint32(f, number)
-                    f.write(file.long_name)
+                    long_name = file.long_name
+                    if isinstance(long_name, str):
+                        long_name = long_name.encode('ascii')
+                    f.write(long_name)
 
             for file in self.files:
                 # Write short name
