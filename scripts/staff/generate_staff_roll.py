@@ -587,7 +587,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--title-font",
         type=Path,
-        default=ROOT / "resources" / "assets" / "font" / "SourceHanSansSC-Regular.otf",
+        default=ROOT / "resources" / "assets" / "font" / "SourceHanSansSC-Medium.otf",
     )
     parser.add_argument(
         "--output-dir",

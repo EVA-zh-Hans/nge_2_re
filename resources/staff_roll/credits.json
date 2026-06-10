@@ -57,8 +57,28 @@
       ]
     },
     {
+      "title": "开源协议",
+      "names": [
+        "项目代码",
+        "GPL-3.0",
+        "翻译文本",
+        "CC BY-NC-SA 4.0"
+      ]
+    },
+    {
+      "title": "仓库地址",
+      "names": [
+        "https://github.com/EVA-zh-Hans/nge_2_re"
+      ]
+    },
+    {
       "title": "特别鸣谢",
       "names": [
+        "rezual/nge_2_re",
+        "deeRez",
+        "EvaGeeks 论坛",
+        "PSPDEV 社区",
+        "Paratranz 翻译平台",
         "EVA2 汉化计划全体成员",
         "所有支持和帮助过我们的人"
       ]
