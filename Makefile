@@ -132,13 +132,13 @@ generate_staff_roll:
 	$(UV_RUN) scripts/staff/generate_staff_roll.py
 
 preview_staff_roll: generate_staff_roll
-	@echo "Opening $(BUILD_DIR)/generated/staff_roll/staff21.png..."
+	@echo "Opening $(BUILD_DIR)/generated/staff_roll/staff_roll.png..."
 	@if command -v open >/dev/null 2>&1; then \
-		open $(BUILD_DIR)/generated/staff_roll/staff21.png; \
+		open $(BUILD_DIR)/generated/staff_roll/staff_roll.png; \
 	elif command -v xdg-open >/dev/null 2>&1; then \
-		xdg-open $(BUILD_DIR)/generated/staff_roll/staff21.png; \
+		xdg-open $(BUILD_DIR)/generated/staff_roll/staff_roll.png; \
 	else \
-		echo "Preview: $(BUILD_DIR)/generated/staff_roll/staff21.png"; \
+		echo "Preview: $(BUILD_DIR)/generated/staff_roll/staff_roll.png"; \
 	fi
 
 inject_staff_roll: export_hgar generate_staff_roll

@@ -2,16 +2,60 @@
 #pragma once
 
 #define STAFF_ROLL_EXTRA_ROW_BASE 214
-#define STAFF_ROLL_EXTRA_ROW_COUNT 2
-#define STAFF_ROLL_EXTRA_COMMAND_COUNT 3
+#define STAFF_ROLL_EXTRA_ROW_COUNT 34
+#define STAFF_ROLL_ATLAS_COUNT 2
+#define STAFF_ROLL_EXTRA_COMMAND_COUNT 36
 #define STAFF_ROLL_ORIGINAL_COMMAND_COUNT 196
 #define STAFF_ROLL_INSERT_INDEX 189
 #define STAFF_ROLL_EXTENDED_COMMAND_COUNT \
     (STAFF_ROLL_ORIGINAL_COMMAND_COUNT + STAFF_ROLL_EXTRA_COMMAND_COUNT)
-#define STAFF_ROLL_ATLAS_NAME "staff21"
+
+typedef struct StaffRollAtlasInfo {
+    const char *name;
+    int16_t first_row;
+    int16_t row_count;
+} StaffRollAtlasInfo;
+
+static const StaffRollAtlasInfo g_staffRollAtlases[STAFF_ROLL_ATLAS_COUNT] = {
+    {"staff21", 214, 19},
+    {"staff22", 233, 15},
+};
 
 static const StaffScrollCmd g_staffRollExtraCommands[STAFF_ROLL_EXTRA_COMMAND_COUNT] = {
     {0x00001088u, -1, -1},
     {0x00100208u, 214, -1},
+    {0x00000108u, -1, -1},
     {0x00000208u, 215, -1},
+    {0x00000108u, -1, -1},
+    {0x00100208u, 216, -1},
+    {0x00000108u, -1, -1},
+    {0x0000020Au, 217, 218},
+    {0x00000108u, -1, -1},
+    {0x00100208u, 219, -1},
+    {0x00000108u, -1, -1},
+    {0x0000020Au, 220, 221},
+    {0x0000020Au, 222, 223},
+    {0x0000020Au, 224, 225},
+    {0x0000020Au, 226, 227},
+    {0x0000020Au, 228, 229},
+    {0x0000020Au, 230, 231},
+    {0x00000108u, -1, -1},
+    {0x00100208u, 232, -1},
+    {0x00000108u, -1, -1},
+    {0x0000020Au, 233, 234},
+    {0x0000020Au, 235, 236},
+    {0x0000020Au, 237, 238},
+    {0x00000208u, 239, -1},
+    {0x00000108u, -1, -1},
+    {0x00100208u, 240, -1},
+    {0x00000108u, -1, -1},
+    {0x00000208u, 241, -1},
+    {0x00000108u, -1, -1},
+    {0x00100208u, 242, -1},
+    {0x00000108u, -1, -1},
+    {0x0000020Au, 243, 244},
+    {0x00000108u, -1, -1},
+    {0x00100208u, 245, -1},
+    {0x00000108u, -1, -1},
+    {0x0000020Au, 246, 247},
 };

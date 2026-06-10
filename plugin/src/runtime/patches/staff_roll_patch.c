@@ -60,18 +60,37 @@ static StaffRollAllocRowFn g_staffRollOriginalAllocRow;
 
 static u32 g_staffRollCtxPtrAddr;
 static u32 g_staffRollFrameLimitAddr;
-static int g_staffRollExtraHpt = -1;
+static int g_staffRollExtraHpts[STAFF_ROLL_ATLAS_COUNT];
 static int g_staffRollFrameLimitPatched;
 static StaffScrollCmd g_staffRollExtendedCommands[STAFF_ROLL_EXTENDED_COMMAND_COUNT];
-
-static u32 StaffRollPatch_ReadU32(u32 addr)
-{
-    return *(const volatile u32 *)addr;
-}
 
 static void *StaffRollPatch_GetCtx(void)
 {
     return *(void *const volatile *)g_staffRollCtxPtrAddr;
+}
+
+static void StaffRollPatch_ResetAtlasHandles(void)
+{
+    int atlasIndex;
+
+    for (atlasIndex = 0; atlasIndex < STAFF_ROLL_ATLAS_COUNT; ++atlasIndex)
+    {
+        g_staffRollExtraHpts[atlasIndex] = -1;
+    }
+}
+
+static void StaffRollPatch_ReleaseAtlases(void)
+{
+    int atlasIndex;
+
+    for (atlasIndex = 0; atlasIndex < STAFF_ROLL_ATLAS_COUNT; ++atlasIndex)
+    {
+        if (g_staffRollExtraHpts[atlasIndex] >= 0)
+        {
+            g_staffRollRelease(g_staffRollExtraHpts[atlasIndex]);
+            g_staffRollExtraHpts[atlasIndex] = -1;
+        }
+    }
 }
 
 static int StaffRollPatch_BuildExtendedTable(const StaffScrollCmd *original)
@@ -145,18 +164,33 @@ static int StaffRollPatch_CalculateFrameLimit(float speed)
 
 static void StaffRollPatch_InitHook(void)
 {
+    union {
+        float value;
+        unsigned int bits;
+    } speedValue;
     void *ctx;
+    int atlasIndex;
     int frameLimit;
-    float speed;
 
     StaffRollLog_Printf("staffroll init hook begin");
     g_staffRollOriginalInit();
-    g_staffRollExtraHpt = g_staffRollFindEntry(STAFF_ROLL_ATLAS_NAME);
-    StaffRollLog_Printf("staffroll find entry %s -> %d", STAFF_ROLL_ATLAS_NAME, g_staffRollExtraHpt);
-    if (g_staffRollExtraHpt < 0)
+    StaffRollPatch_ResetAtlasHandles();
+    for (atlasIndex = 0; atlasIndex < STAFF_ROLL_ATLAS_COUNT; ++atlasIndex)
     {
-        StaffRollLog_Printf("staffroll init hook: atlas missing");
-        return;
+        g_staffRollExtraHpts[atlasIndex] =
+            g_staffRollFindEntry(g_staffRollAtlases[atlasIndex].name);
+        StaffRollLog_Printf(
+            "staffroll find entry %s -> %d",
+            g_staffRollAtlases[atlasIndex].name,
+            g_staffRollExtraHpts[atlasIndex]);
+        if (g_staffRollExtraHpts[atlasIndex] < 0)
+        {
+            StaffRollLog_Printf(
+                "staffroll init hook: atlas missing index=%d",
+                atlasIndex);
+            StaffRollPatch_ReleaseAtlases();
+            return;
+        }
     }
 
     ctx = StaffRollPatch_GetCtx();
@@ -164,22 +198,21 @@ static void StaffRollPatch_InitHook(void)
     if (!ctx)
     {
         StaffRollLog_Printf("staffroll init hook: ctx null");
-        g_staffRollRelease(g_staffRollExtraHpt);
-        g_staffRollExtraHpt = -1;
+        StaffRollPatch_ReleaseAtlases();
         return;
     }
 
-    speed = *(const float *)((const uint8_t *)ctx + STAFF_ROLL_CTX_SCROLL_SPEED_OFFSET);
-    frameLimit = StaffRollPatch_CalculateFrameLimit(speed);
+    speedValue.value =
+        *(const float *)((const uint8_t *)ctx + STAFF_ROLL_CTX_SCROLL_SPEED_OFFSET);
+    frameLimit = StaffRollPatch_CalculateFrameLimit(speedValue.value);
     StaffRollLog_Printf(
         "staffroll speed_raw=%08x frameLimit=%d",
-        *(const unsigned int *)&speed,
+        speedValue.bits,
         frameLimit);
     if (frameLimit <= 0 || frameLimit > STAFF_ROLL_MAX_FRAME_LIMIT)
     {
         StaffRollLog_Printf("staffroll init hook: invalid frame limit");
-        g_staffRollRelease(g_staffRollExtraHpt);
-        g_staffRollExtraHpt = -1;
+        StaffRollPatch_ReleaseAtlases();
         return;
     }
 
@@ -199,12 +232,11 @@ static void StaffRollPatch_InitHook(void)
 
 static void StaffRollPatch_DestroyHook(void)
 {
-    StaffRollLog_Printf("staffroll destroy hook begin extraHpt=%d patched=%d", g_staffRollExtraHpt, g_staffRollFrameLimitPatched);
-    if (g_staffRollExtraHpt >= 0)
-    {
-        g_staffRollRelease(g_staffRollExtraHpt);
-        g_staffRollExtraHpt = -1;
-    }
+    StaffRollLog_Printf(
+        "staffroll destroy hook begin atlases=%d patched=%d",
+        STAFF_ROLL_ATLAS_COUNT,
+        g_staffRollFrameLimitPatched);
+    StaffRollPatch_ReleaseAtlases();
 
     if (g_staffRollFrameLimitPatched)
     {
@@ -219,36 +251,51 @@ static void StaffRollPatch_DestroyHook(void)
 
 static int StaffRollPatch_AllocRowHook(int rowId)
 {
-    int localRow;
+    int atlasIndex;
 
     if (rowId < STAFF_ROLL_ORIGINAL_ROW_COUNT)
     {
         return g_staffRollOriginalAllocRow(rowId);
     }
 
-    localRow = rowId - STAFF_ROLL_EXTRA_ROW_BASE + 1;
-    if (g_staffRollExtraHpt < 0 ||
-        localRow < 1 ||
-        localRow > STAFF_ROLL_EXTRA_ROW_COUNT)
+    for (atlasIndex = 0; atlasIndex < STAFF_ROLL_ATLAS_COUNT; ++atlasIndex)
     {
-        StaffRollLog_Printf(
-            "staffroll alloc row fail rowId=%d extraHpt=%d localRow=%d",
-            rowId,
-            g_staffRollExtraHpt,
-            localRow);
-        return -1;
+        const StaffRollAtlasInfo *atlas = &g_staffRollAtlases[atlasIndex];
+        int localRow = rowId - atlas->first_row + 1;
+        if (localRow < 1 || localRow > atlas->row_count)
+        {
+            continue;
+        }
+        if (g_staffRollExtraHpts[atlasIndex] < 0)
+        {
+            StaffRollLog_Printf(
+                "staffroll alloc row fail rowId=%d atlas=%d handle=%d",
+                rowId,
+                atlasIndex,
+                g_staffRollExtraHpts[atlasIndex]);
+            return -1;
+        }
+
+        {
+            int sprite = g_staffRollCreateRowSprite(
+                g_staffRollExtraHpts[atlasIndex],
+                localRow,
+                0x4000,
+                512,
+                24);
+            StaffRollLog_Printf(
+                "staffroll alloc row rowId=%d atlas=%d localRow=%d hpt=%d sprite=%d",
+                rowId,
+                atlasIndex,
+                localRow,
+                g_staffRollExtraHpts[atlasIndex],
+                sprite);
+            return sprite;
+        }
     }
 
-    {
-        int sprite = g_staffRollCreateRowSprite(g_staffRollExtraHpt, localRow, 0x4000, 512, 24);
-        StaffRollLog_Printf(
-            "staffroll alloc row rowId=%d localRow=%d hpt=%d sprite=%d",
-            rowId,
-            localRow,
-            g_staffRollExtraHpt,
-            sprite);
-        return sprite;
-    }
+    StaffRollLog_Printf("staffroll alloc row fail rowId=%d unmapped", rowId);
+    return -1;
 }
 
 void StaffRollPatch_Install(u32 game_base)
@@ -264,6 +311,7 @@ void StaffRollPatch_Install(u32 game_base)
 
     g_staffRollFrameLimitAddr = HookWrite_GameAddr(game_base, STAFF_ROLL_ADDR_FRAME_LIMIT);
     g_staffRollCtxPtrAddr = HookWrite_GameAddr(game_base, STAFF_ROLL_ADDR_CTX_PTR);
+    StaffRollPatch_ResetAtlasHandles();
     StaffRollLog_Printf(
         "staffroll install begin base=%08x init=%08x destroy=%08x alloc=%08x",
         game_base,
