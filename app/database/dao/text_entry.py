@@ -2,6 +2,8 @@ import hashlib
 import logging
 from tqdm import tqdm
 
+from app.parser.tools.info_text import validate_info_text
+
 from ..db import get_db
 from ..entity.text_entry import TextEntry
 from ..entity.translation import Translation
@@ -74,8 +76,13 @@ class TextEntryDao:
             text_archive: 要填充的 TextArchive 对象
         """
         with next(get_db()) as db:
-            # 获取所有条目，按原始条目顺序（id）
-            db_entries = db.query(TextEntry).filter(TextEntry.filename == filename).order_by(TextEntry.id).all()
+            # 获取所有条目，按文件中的原始索引顺序
+            db_entries = (
+                db.query(TextEntry)
+                .filter(TextEntry.filename == filename)
+                .order_by(TextEntry.entry_index)
+                .all()
+            )
             
             if not db_entries:
                 logger.debug(f"  [TextEntry] No entries found for {filename}")
@@ -93,6 +100,7 @@ class TextEntryDao:
             string_key_to_idx = {}
             text_archive.strings = []
             text_archive.entries = []
+            validation_errors = []
             
             # --- Optimization: Batch fetch translations ---
             entry_hashes = {} # id -> hash
@@ -124,6 +132,16 @@ class TextEntryDao:
 
                 # FIXME: 这里最好统一
                 translated_content = trans_content.replace("\\n", "\n") if trans_content else db_entry.original
+
+                if trans_content and filename.lower() == "f2info.bin":
+                    try:
+                        validate_info_text(
+                            translated_content,
+                            entry_label=f"{filename} entry {db_entry.entry_index}",
+                        )
+                    except ValueError as exc:
+                        validation_errors.append(str(exc))
+                        translated_content = db_entry.original
                 
                 if trans_content:
                     # logger.debug("Translation Found: %s -> %s", db_entry.original, translated_content)
@@ -152,6 +170,13 @@ class TextEntryDao:
                     db_entry.entry_unknown,
                     string_idx
                 ))
+
+            if validation_errors:
+                details = "\n".join(f"- {error}" for error in validation_errors)
+                raise ValueError(
+                    f"Refusing to export unsafe {filename} translations "
+                    f"({len(validation_errors)} errors):\n{details}"
+                )
             
             logger.debug(f"  [TextEntry] Rebuilt {len(text_archive.entries)} entries with {len(text_archive.strings)} strings for {filename}")
     
