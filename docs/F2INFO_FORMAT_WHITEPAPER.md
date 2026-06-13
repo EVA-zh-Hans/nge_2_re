@@ -271,17 +271,7 @@ EVA的构造：一般情报
 自动重排会保留段落边界，但可能改变原分页位置。标题和正文措辞不会被修改。
 标题缺失或超长、非法页数行、CR、NUL、`%`，以及重排后超过 9 页时仍拒绝导出。
 
-导出时可选择生成仅包含自动修复条目的 Paratranz 增量 JSON：
-
-```bash
-uv run -m app.cli.main \
-  --export_text build/ULJS00064/PSP_GAME/USRDIR/free \
-  --text_filename f2info.bin \
-  --text_repaired_json build/f2info_repaired.json
-```
-
-每项包含原文 MD5 `key`、`original` 和修复后的 `translation`，不包含或修改
-Paratranz `stage`。该文件可用于审核或增量覆盖翻译。
+可修复的排版问题会静默处理，不生成额外报告或要求调用方处理修复结果。
 
 `TextEntryDao.rebuild_text_archive()` 会收集无法安全修复的错误，并在保存前统一
 抛出异常，拒绝生成危险文件。
@@ -289,7 +279,7 @@ Paratranz `stage`。该文件可用于审核或增量覆盖翻译。
 建议验证路径：
 
 ```bash
-uv run -m pytest tests/unit/test_info_text.py
+uv run python -m unittest tests.unit.test_info_text -v
 make export_all
 ```
 

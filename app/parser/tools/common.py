@@ -92,8 +92,10 @@ def _encode_char_cached(char):
     # 日文中常用的长音符号是(ー, U+30FC)
     # 另外还存在一种破折号（―, U+2015） 
     # GB2312 会将破折号映射为 U+2015 (HORIZONTAL BAR), 而 GBK 映射到 U+2014 与现在输入法行为相符。
-    # if char == '—':
-    #     char = 'ー'
+    if char == '—':
+        # U+2014 maps to custom code A6 0A, whose second byte is interpreted
+        # as a line feed by some game text parsers. U+2015 is native Shift_JIS.
+        char = '―'
     
     # 2. '~'和'～'转换
     # 英文输入法下的波浪号是（~, U+007E）
@@ -132,9 +134,6 @@ def to_eva_sjis(content):
     # We let most remain as regular ASCII
     #content = content.replace('N²', 'Ν')
     #content = content.replace('S²', 'Σ')
-    # U+2014 maps to the custom code A6 0A, whose second byte is interpreted
-    # as a line feed by some game text parsers. U+2015 is native Shift_JIS.
-    content = content.replace('—', '―')
     return b''.join(_encode_char_cached(char) for char in content)
 
 def unique_color(index, total):
