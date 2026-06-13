@@ -132,6 +132,9 @@ def to_eva_sjis(content):
     # We let most remain as regular ASCII
     #content = content.replace('N²', 'Ν')
     #content = content.replace('S²', 'Σ')
+    # U+2014 maps to the custom code A6 0A, whose second byte is interpreted
+    # as a line feed by some game text parsers. U+2015 is native Shift_JIS.
+    content = content.replace('—', '―')
     return b''.join(_encode_char_cached(char) for char in content)
 
 def unique_color(index, total):
@@ -164,5 +167,3 @@ def unique_color(index, total):
         return (subsectofractional, 0, 255)
 
     return (255, 0, subremaindersectofractional)
-
-   

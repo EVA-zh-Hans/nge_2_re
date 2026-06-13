@@ -2,7 +2,7 @@ import hashlib
 import logging
 from tqdm import tqdm
 
-from app.parser.tools.info_text import validate_info_text
+from app.parser.tools.info_text import normalize_info_text
 
 from ..db import get_db
 from ..entity.text_entry import TextEntry
@@ -67,7 +67,7 @@ class TextEntryDao:
             return entries
     
     @staticmethod
-    def rebuild_text_archive(filename: str, text_archive):
+    def rebuild_text_archive(filename: str, text_archive) -> None:
         """
         从数据库重建 TextArchive（应用翻译）
         
@@ -135,7 +135,7 @@ class TextEntryDao:
 
                 if trans_content and filename.lower() == "f2info.bin":
                     try:
-                        validate_info_text(
+                        translated_content, _ = normalize_info_text(
                             translated_content,
                             entry_label=f"{filename} entry {db_entry.entry_index}",
                         )
