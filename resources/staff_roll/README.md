@@ -13,3 +13,6 @@
 总预览 `staff_roll.png`、元数据和 PRX 使用的 `generated_staff_roll.h`。
 运行 `make inject_staff_roll` 会把全部图集注入已导出的
 `build/ULJS00064/PSP_GAME/USRDIR/game/staff.har`，并清理已不再需要的旧扩展图集。
+
+字体文件不提交到仓库。GitHub CI 会下载固定版本的简中 Source Han OTF，
+并写入 `resources/assets/font/` 下的默认路径后再执行构建。
