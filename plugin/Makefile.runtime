@@ -9,7 +9,7 @@ OBJS = src/runtime/runtime_entry.o src/runtime/runtime_patch.o src/runtime/hook_
  src/runtime/patches/savedata_patch.o\
  src/runtime/patches/message_dialog_patch.o\
  src/runtime/patches/debug_patch.o\
- src/runtime/patches/staff_roll_log.o\
+ src/runtime/patches/runtime_log.o\
  src/runtime/patches/staff_roll_patch.o\
  src/runtime/patches/memtalk/memtalk_patch.o\
  src/runtime/patches/memtalk/memtalk_game_calls.o\

@@ -2,7 +2,7 @@
 #include <string.h>
 
 #include "hook_write.h"
-#include "staff_roll_log.h"
+#include "runtime_log.h"
 
 typedef struct StaffScrollCmd {
     uint32_t ctrl;
@@ -100,13 +100,13 @@ static int StaffRollPatch_BuildExtendedTable(const StaffScrollCmd *original)
     if (!original ||
         (original[STAFF_ROLL_ORIGINAL_COMMAND_COUNT - 1].ctrl & STAFF_ROLL_END_FLAG) == 0)
     {
-        StaffRollLog_Printf(
+        RuntimeLog_Printf(
             "staffroll build table: invalid original table or missing end flag");
         return 0;
     }
 
     suffixCount = STAFF_ROLL_ORIGINAL_COMMAND_COUNT - STAFF_ROLL_INSERT_INDEX;
-    StaffRollLog_Printf(
+    RuntimeLog_Printf(
         "staffroll build table: original=%d extra=%d insert=%d suffix=%d",
         STAFF_ROLL_ORIGINAL_COMMAND_COUNT,
         STAFF_ROLL_EXTRA_COMMAND_COUNT,
@@ -172,20 +172,20 @@ static void StaffRollPatch_InitHook(void)
     int atlasIndex;
     int frameLimit;
 
-    StaffRollLog_Printf("staffroll init hook begin");
+    RuntimeLog_Printf("staffroll init hook begin");
     g_staffRollOriginalInit();
     StaffRollPatch_ResetAtlasHandles();
     for (atlasIndex = 0; atlasIndex < STAFF_ROLL_ATLAS_COUNT; ++atlasIndex)
     {
         g_staffRollExtraHpts[atlasIndex] =
             g_staffRollFindEntry(g_staffRollAtlases[atlasIndex].name);
-        StaffRollLog_Printf(
+        RuntimeLog_Printf(
             "staffroll find entry %s -> %d",
             g_staffRollAtlases[atlasIndex].name,
             g_staffRollExtraHpts[atlasIndex]);
         if (g_staffRollExtraHpts[atlasIndex] < 0)
         {
-            StaffRollLog_Printf(
+            RuntimeLog_Printf(
                 "staffroll init hook: atlas missing index=%d",
                 atlasIndex);
             StaffRollPatch_ReleaseAtlases();
@@ -194,10 +194,10 @@ static void StaffRollPatch_InitHook(void)
     }
 
     ctx = StaffRollPatch_GetCtx();
-    StaffRollLog_Printf("staffroll ctx=%08x", (unsigned)ctx);
+    RuntimeLog_Printf("staffroll ctx=%08x", (unsigned)ctx);
     if (!ctx)
     {
-        StaffRollLog_Printf("staffroll init hook: ctx null");
+        RuntimeLog_Printf("staffroll init hook: ctx null");
         StaffRollPatch_ReleaseAtlases();
         return;
     }
@@ -205,18 +205,18 @@ static void StaffRollPatch_InitHook(void)
     speedValue.value =
         *(const float *)((const uint8_t *)ctx + STAFF_ROLL_CTX_SCROLL_SPEED_OFFSET);
     frameLimit = StaffRollPatch_CalculateFrameLimit(speedValue.value);
-    StaffRollLog_Printf(
+    RuntimeLog_Printf(
         "staffroll speed_raw=%08x frameLimit=%d",
         speedValue.bits,
         frameLimit);
     if (frameLimit <= 0 || frameLimit > STAFF_ROLL_MAX_FRAME_LIMIT)
     {
-        StaffRollLog_Printf("staffroll init hook: invalid frame limit");
+        RuntimeLog_Printf("staffroll init hook: invalid frame limit");
         StaffRollPatch_ReleaseAtlases();
         return;
     }
 
-    StaffRollLog_Printf(
+    RuntimeLog_Printf(
         "staffroll command ptr %08x -> %08x",
         (unsigned)*(const uint32_t *)((uint8_t *)ctx + STAFF_ROLL_CTX_COMMAND_PTR_OFFSET),
         (unsigned)g_staffRollExtendedCommands);
@@ -227,12 +227,12 @@ static void StaffRollPatch_InitHook(void)
         STAFF_ROLL_OPCODE_SLTI_A3_S0 | (u32)frameLimit);
     g_staffRollFrameLimitPatched = 1;
     HookWrite_FlushCaches();
-    StaffRollLog_Printf("staffroll init hook: installed frameLimit=%d", frameLimit);
+    RuntimeLog_Printf("staffroll init hook: installed frameLimit=%d", frameLimit);
 }
 
 static void StaffRollPatch_DestroyHook(void)
 {
-    StaffRollLog_Printf(
+    RuntimeLog_Printf(
         "staffroll destroy hook begin atlases=%d patched=%d",
         STAFF_ROLL_ATLAS_COUNT,
         g_staffRollFrameLimitPatched);
@@ -246,7 +246,7 @@ static void StaffRollPatch_DestroyHook(void)
     }
 
     g_staffRollOriginalDestroy();
-    StaffRollLog_Printf("staffroll destroy hook end");
+    RuntimeLog_Printf("staffroll destroy hook end");
 }
 
 static int StaffRollPatch_AllocRowHook(int rowId)
@@ -268,7 +268,7 @@ static int StaffRollPatch_AllocRowHook(int rowId)
         }
         if (g_staffRollExtraHpts[atlasIndex] < 0)
         {
-            StaffRollLog_Printf(
+            RuntimeLog_Printf(
                 "staffroll alloc row fail rowId=%d atlas=%d handle=%d",
                 rowId,
                 atlasIndex,
@@ -283,7 +283,7 @@ static int StaffRollPatch_AllocRowHook(int rowId)
                 0x4000,
                 512,
                 24);
-            StaffRollLog_Printf(
+            RuntimeLog_Printf(
                 "staffroll alloc row rowId=%d atlas=%d localRow=%d hpt=%d sprite=%d",
                 rowId,
                 atlasIndex,
@@ -294,7 +294,7 @@ static int StaffRollPatch_AllocRowHook(int rowId)
         }
     }
 
-    StaffRollLog_Printf("staffroll alloc row fail rowId=%d unmapped", rowId);
+    RuntimeLog_Printf("staffroll alloc row fail rowId=%d unmapped", rowId);
     return -1;
 }
 
@@ -312,7 +312,7 @@ void StaffRollPatch_Install(u32 game_base)
     g_staffRollFrameLimitAddr = HookWrite_GameAddr(game_base, STAFF_ROLL_ADDR_FRAME_LIMIT);
     g_staffRollCtxPtrAddr = HookWrite_GameAddr(game_base, STAFF_ROLL_ADDR_CTX_PTR);
     StaffRollPatch_ResetAtlasHandles();
-    StaffRollLog_Printf(
+    RuntimeLog_Printf(
         "staffroll install begin base=%08x init=%08x destroy=%08x alloc=%08x",
         game_base,
         hookInit,
@@ -321,7 +321,7 @@ void StaffRollPatch_Install(u32 game_base)
 
     if (!StaffRollPatch_BuildExtendedTable(originalTable))
     {
-        StaffRollLog_Printf("staffroll install abort: build table failed");
+        RuntimeLog_Printf("staffroll install abort: build table failed");
         return;
     }
 
@@ -349,5 +349,5 @@ void StaffRollPatch_Install(u32 game_base)
     HookWrite_Call(hookAllocLeft, StaffRollPatch_AllocRowHook);
     HookWrite_Call(hookAllocRight, StaffRollPatch_AllocRowHook);
     HookWrite_Call(hookAllocSeparator, StaffRollPatch_AllocRowHook);
-    StaffRollLog_Printf("staffroll install success");
+    RuntimeLog_Printf("staffroll install success");
 }
