@@ -23,6 +23,10 @@ if TYPE_CHECKING:
     from PIL import Image as PILImage
 
 
+ROOT = Path(__file__).resolve().parents[1]
+SOURCE_HAN_SANS_SC = ROOT / "resources" / "assets" / "font" / "SourceHanSansSC-Medium.otf"
+
+
 def get_git_commit(repo_path: str = ".") -> str:
     """Get the current git commit hash."""
     try:
@@ -264,6 +268,7 @@ def generate_metadata_image(metadata: Dict[str, Any], output_path: str):
     # Load fonts
     try:
         font_paths = [
+            str(SOURCE_HAN_SANS_SC),
             "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/System/Library/Fonts/Helvetica.ttc",
@@ -426,6 +431,7 @@ def generate_metadata_pic0(metadata: Dict[str, Any], output_path: str):
     try:
         # Try common font paths across different systems with CJK support
         font_paths = [
+            str(SOURCE_HAN_SANS_SC),
             "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",  # Noto Sans CJK
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Fallback
             "/System/Library/Fonts/Helvetica.ttc",  # macOS

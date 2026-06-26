@@ -1,0 +1,87 @@
+{
+  "font_size": 22,
+  "sections": [
+    {
+      "title": "汉化制作",
+      "names": [
+        "EVA2 汉化计划"
+      ]
+    },
+    {
+      "title": "统筹",
+      "names": [
+        "main_void",
+        "hanDragon20"
+      ]
+    },
+    {
+      "title": "翻译",
+      "names": [
+        "pan1927412",
+        "hanDragon20",
+        "Frykte",
+        "Liana384",
+        "Belfraw",
+        "Tianying.exe",
+        "カロモリモキナエ",
+        "Asuka",
+        "mel",
+        "Laolv000",
+        "zxlraw",
+        "yokuse"
+      ]
+    },
+    {
+      "title": "校对",
+      "names": [
+        "hanDragon20",
+        "Frykte",
+        "Belfraw",
+        "カロモリモキナエ",
+        "Asuka",
+        "mel",
+        "Laolv000"
+      ]
+    },
+    {
+      "title": "程序",
+      "names": [
+        "main_void"
+      ]
+    },
+    {
+      "title": "美工",
+      "names": [
+        "main_void",
+        "Belfraw"
+      ]
+    },
+    {
+      "title": "开源协议",
+      "names": [
+        "项目代码",
+        "GPL-3.0",
+        "翻译文本",
+        "CC BY-NC-SA 4.0"
+      ]
+    },
+    {
+      "title": "仓库地址",
+      "names": [
+        "https://github.com/EVA-zh-Hans/nge_2_re"
+      ]
+    },
+    {
+      "title": "特别鸣谢",
+      "names": [
+        "rezual/nge_2_re",
+        "deeRez",
+        "EvaGeeks 论坛",
+        "PSPDEV 社区",
+        "Paratranz 翻译平台",
+        "EVA2 汉化计划全体成员",
+        "所有支持和帮助过我们的人"
+      ]
+    }
+  ]
+}

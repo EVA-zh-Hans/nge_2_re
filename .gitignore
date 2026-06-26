@@ -33,3 +33,6 @@ pz_downloads
 temp
 build
 dist
+resources/assets/font/*.otf
+resources/assets/font/*.ttc
+resources/assets/font/*.ttf

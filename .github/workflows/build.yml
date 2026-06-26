@@ -48,36 +48,53 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    # 4a. 恢复 ISO 缓存
+    # 4a. 生成固定 revision 的 ISO 缓存 key
+    - name: Resolve ISO Cache Key
+      id: iso-cache-key
+      env:
+        HF_REPO_ID: ${{ secrets.HF_REPO_ID }}
+        HF_REVISION: ${{ secrets.HF_REVISION }}
+      run: |
+        set -euo pipefail
+        test -n "$HF_REPO_ID"
+        test -n "$HF_REVISION"
+        ISO_CACHE_KEY=$(printf '%s:%s' "$HF_REPO_ID" "$HF_REVISION" | sha256sum | cut -c1-16)
+        echo "iso_cache_key=$ISO_CACHE_KEY" >> "$GITHUB_OUTPUT"
+
+    # 4b. 恢复 ISO 缓存
     - name: Restore ISO Cache
       uses: actions/cache@v4
       id: cache-iso
       with:
         path: temp/*.iso
-        key: iso-${{ secrets.HF_REPO_ID }}
-        restore-keys: iso-
+        key: iso-${{ steps.iso-cache-key.outputs.iso_cache_key }}
 
-    # 4b. 安装 HF CLI 并下载 ISO（缓存未命中时）
+    # 4c. 安装 HF CLI 并下载 ISO（缓存未命中时）
     - name: Download ISO from Hugging Face
       if: steps.cache-iso.outputs.cache-hit != 'true'
       env:
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
         HF_REPO_ID: ${{ secrets.HF_REPO_ID }}
+        HF_REVISION: ${{ secrets.HF_REVISION }}
       run: |
         echo "📦 Installing Hugging Face CLI..."
         curl -LsSf https://hf.co/cli/install.sh | bash
         export PATH="$HOME/.local/bin:$PATH"
         
-        echo "⬇️ Downloading ISO from Hugging Face Repo: $HF_REPO_ID..."
+        echo "⬇️ Downloading ISO from pinned Hugging Face revision..."
         mkdir -p temp
         hf download "$HF_REPO_ID" ULJS00064.iso \
+          --revision "$HF_REVISION" \
           --repo-type model \
           --token "$HF_TOKEN" \
           --local-dir temp
         hf download "$HF_REPO_ID" ULJS00061.iso \
+          --revision "$HF_REVISION" \
           --repo-type model \
           --token "$HF_TOKEN" \
           --local-dir temp
+        test -s temp/ULJS00064.iso
+        test -s temp/ULJS00061.iso
 
     # 5. 根据 Dockerfile 哈希复用镜像；仅在未命中时构建
     - name: Resolve Docker Image Tag
@@ -140,6 +157,25 @@ jobs:
             
             echo "🔧 Configuring Git safe directory..."
             git config --global --add safe.directory "*"
+
+            echo "🔤 Preparing Staff Roll fonts..."
+            mkdir -p resources/assets/font temp/font-downloads
+            curl -fL --retry 3 \
+              -o temp/font-downloads/SourceHanSerifSC.zip \
+              https://github.com/adobe-fonts/source-han-serif/releases/download/2.003R/09_SourceHanSerifSC.zip
+            curl -fL --retry 3 \
+              -o temp/font-downloads/SourceHanSansSC.zip \
+              https://github.com/adobe-fonts/source-han-sans/releases/download/2.005R/09_SourceHanSansSC.zip
+            SERIF_FONT_ENTRY=$(unzip -Z1 temp/font-downloads/SourceHanSerifSC.zip | grep "/SourceHanSerifSC-Heavy.otf$" | head -n 1)
+            SANS_FONT_ENTRY=$(unzip -Z1 temp/font-downloads/SourceHanSansSC.zip | grep "/SourceHanSansSC-Medium.otf$" | head -n 1)
+            test -n "$SERIF_FONT_ENTRY"
+            test -n "$SANS_FONT_ENTRY"
+            unzip -p temp/font-downloads/SourceHanSerifSC.zip "$SERIF_FONT_ENTRY" \
+              > resources/assets/font/SourceHanSerifSC-Heavy.otf
+            unzip -p temp/font-downloads/SourceHanSansSC.zip "$SANS_FONT_ENTRY" \
+              > resources/assets/font/SourceHanSansSC-Medium.otf
+            test -s resources/assets/font/SourceHanSerifSC-Heavy.otf
+            test -s resources/assets/font/SourceHanSansSC-Medium.otf
 
             uv venv
             
