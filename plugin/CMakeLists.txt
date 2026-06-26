@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Set project name  
-project(EBOOT)
+project(EBOOT C ASM)
 
 # Check if DEBUG is set  
 if(DEFINED DEBUG)
@@ -29,6 +29,8 @@ set(RUNTIME_SOURCES
     src/runtime/patches/savedata_patch.c
     src/runtime/patches/message_dialog_patch.c
     src/runtime/patches/debug_patch.c
+    src/runtime/patches/runtime_log.c
+    src/runtime/patches/staff_roll_patch.c
     src/runtime/patches/memtalk/memtalk_patch.c
     src/runtime/patches/memtalk/memtalk_game_calls.c
     src/runtime/patches/memtalk/memtalk_templates.c
