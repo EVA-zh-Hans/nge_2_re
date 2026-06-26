@@ -48,36 +48,53 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    # 4a. 恢复 ISO 缓存
+    # 4a. 生成固定 revision 的 ISO 缓存 key
+    - name: Resolve ISO Cache Key
+      id: iso-cache-key
+      env:
+        HF_REPO_ID: ${{ secrets.HF_REPO_ID }}
+        HF_REVISION: ${{ secrets.HF_REVISION }}
+      run: |
+        set -euo pipefail
+        test -n "$HF_REPO_ID"
+        test -n "$HF_REVISION"
+        ISO_CACHE_KEY=$(printf '%s:%s' "$HF_REPO_ID" "$HF_REVISION" | sha256sum | cut -c1-16)
+        echo "iso_cache_key=$ISO_CACHE_KEY" >> "$GITHUB_OUTPUT"
+
+    # 4b. 恢复 ISO 缓存
     - name: Restore ISO Cache
       uses: actions/cache@v4
       id: cache-iso
       with:
         path: temp/*.iso
-        key: iso-${{ secrets.HF_REPO_ID }}
-        restore-keys: iso-
+        key: iso-${{ steps.iso-cache-key.outputs.iso_cache_key }}
 
-    # 4b. 安装 HF CLI 并下载 ISO（缓存未命中时）
+    # 4c. 安装 HF CLI 并下载 ISO（缓存未命中时）
     - name: Download ISO from Hugging Face
       if: steps.cache-iso.outputs.cache-hit != 'true'
       env:
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
         HF_REPO_ID: ${{ secrets.HF_REPO_ID }}
+        HF_REVISION: ${{ secrets.HF_REVISION }}
       run: |
         echo "📦 Installing Hugging Face CLI..."
         curl -LsSf https://hf.co/cli/install.sh | bash
         export PATH="$HOME/.local/bin:$PATH"
         
-        echo "⬇️ Downloading ISO from Hugging Face Repo: $HF_REPO_ID..."
+        echo "⬇️ Downloading ISO from pinned Hugging Face revision..."
         mkdir -p temp
         hf download "$HF_REPO_ID" ULJS00064.iso \
+          --revision "$HF_REVISION" \
           --repo-type model \
           --token "$HF_TOKEN" \
           --local-dir temp
         hf download "$HF_REPO_ID" ULJS00061.iso \
+          --revision "$HF_REVISION" \
           --repo-type model \
           --token "$HF_TOKEN" \
           --local-dir temp
+        test -s temp/ULJS00064.iso
+        test -s temp/ULJS00061.iso
 
     # 5. 根据 Dockerfile 哈希复用镜像；仅在未命中时构建
     - name: Resolve Docker Image Tag
