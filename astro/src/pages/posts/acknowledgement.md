@@ -133,14 +133,8 @@ layout: ../../layouts/MarkdownPostLayout.astro
  
 
 ## 使用方法
-
  
 本补丁以xdelta3格式发布。打补丁需要原始游戏镜像。
-
-| 版本号    | 原始镜像CRC32 | 补丁后镜像CRC32 |
-| --------- | ------------- | --------------- |
-| ULJS00064 | 1C8AF7DD      | F948F654    |
-| ULJS00061 | CD46A4EC      | F7AB08B5        |
  
 可以在网页端使用 https://kotcrab.github.io/xdelta-wasm/ 在线应用补丁（不消耗流量），在Source file处选择原始镜像文件，Patch file处选择对应版本的补丁文件。
  
