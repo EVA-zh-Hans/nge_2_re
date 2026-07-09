@@ -15,6 +15,7 @@ class EVSEntry(Base):
     # size = Column(Integer)
     param = Column(JSON)
     sentence_key = Column(String, ForeignKey("sentences.key"), nullable=True)
+    translation = Column(String, nullable=True)
 
     hgar_file_id = Column(
         Integer, ForeignKey("hgar_files.id"), index=True, nullable=False

@@ -9,6 +9,7 @@ from app.database.dao.translation import TranslationDao
 from app.database.dao.hgpt import HgptDao
 from app.database.dao.text_entry import TextEntryDao
 from app.database.dao.bind import BindDao
+from app.database.dao.evs import EVSDao
 
 from app.database.db import Base, engine, get_db
 from app.utils.evs import get_avatar_and_exp
@@ -96,7 +97,7 @@ class App:
                     count += 1
         else:
             # 导出所有 HAR，按目录结构（逐个处理避免内存占用）
-            print(f"Exporting all HAR files with original directory structure")
+            print("Exporting all HAR files with original directory structure")
             from app.database.entity.hgar import Hgar
             from app.database.db import get_db
             
@@ -263,6 +264,11 @@ class App:
         pass
 
     @staticmethod
+    def import_cev_translation(dir_path: str):
+        imported, skipped = EVSDao.import_cev_translations(dir_path)
+        print(f"Imported {imported} CEV translations, skipped {skipped}")
+
+    @staticmethod
     def output_translation(output_dir: str, prefix: str = None):
         """
         导出翻译 JSON
@@ -274,6 +280,11 @@ class App:
         os.makedirs(output_dir, exist_ok=True)
         
         if prefix:
+            if prefix == "cev":
+                count = EVSDao.export_cev_translations(output_dir)
+                print(f"Exported {count} CEV translation files to {output_dir}/cev")
+                return
+
             # 如果指定了前缀，使用旧的逻辑（按前缀导出，主要用于 event 目录）
             print(f"Exporting {prefix}")
             results = SentenceDao.export_sentence_entry(prefix)
@@ -305,6 +316,11 @@ class App:
             # 1. 导出 event 目录（按前缀分类）
             print("Exporting event directory by prefix...")
             for prefix_item in HGAR_PREFIX:
+                if prefix_item == "cev":
+                    count = EVSDao.export_cev_translations(output_dir)
+                    print(f"  Exported {count} CEV translation files")
+                    continue
+
                 print(f"  Exporting {prefix_item}")
                 results = SentenceDao.export_sentence_entry(prefix_item)
                 if not results:
@@ -394,8 +410,6 @@ class App:
         解析并存储到数据库
         """
         from app.parser.tools import text as text_module
-        from app.database.entity.text_entry import TextEntry
-        
         # 确保表存在
         Base.metadata.create_all(bind=engine)
         
@@ -490,8 +504,6 @@ class App:
         解析并存储到数据库
         """
         from app.parser.tools import bind as bind_module
-        from app.database.entity.bind_entry import BindEntry
-        
         # 确保表存在
         Base.metadata.create_all(bind=engine)
         
@@ -580,7 +592,7 @@ class App:
         """
         from app.elf_patch.patcher import Patcher, TranslationHeader
         
-        print(f"正在生成 EBOOT 翻译文件...")
+        print("正在生成 EBOOT 翻译文件...")
         print(f"翻译文件路径: {translation_path}")
         print(f"输出文件路径: {output_path}")
         
@@ -640,6 +652,11 @@ if __name__ == "__main__":
         "--import_translation",
         type=str,
         help="Path of the translation file from Paratranz",
+    )
+    parser.add_argument(
+        "--import_cev_translation",
+        type=str,
+        help="Path of split CEV translation JSON files from Paratranz",
     )
 
     # Export Translations
@@ -747,6 +764,8 @@ if __name__ == "__main__":
         App.output_evs(args.export_evs, prefix=args.evs_prefix)
     elif args.import_translation:
         App.import_translation(args.import_translation)
+    elif args.import_cev_translation:
+        App.import_cev_translation(args.import_cev_translation)
     elif args.export_translation:
         App.output_translation(args.export_translation, prefix=args.translation_prefix)
     elif args.output_hgar:
