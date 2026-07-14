@@ -2,7 +2,7 @@ import hashlib
 import logging
 from tqdm import tqdm
 
-from app.parser.tools.info_text import normalize_info_text
+from app.parser.tools.info_text import normalize_info_text, normalize_tuto_text
 
 from ..db import get_db
 from ..entity.text_entry import TextEntry
@@ -133,9 +133,17 @@ class TextEntryDao:
                 # FIXME: 这里最好统一
                 translated_content = trans_content.replace("\\n", "\n") if trans_content else db_entry.original
 
-                if trans_content and filename.lower() == "f2info.bin":
+                normalizer = None
+                if trans_content:
+                    lower_filename = filename.lower()
+                    if lower_filename == "f2info.bin":
+                        normalizer = normalize_info_text
+                    elif lower_filename == "f2tuto.bin":
+                        normalizer = normalize_tuto_text
+
+                if normalizer:
                     try:
-                        translated_content, _ = normalize_info_text(
+                        translated_content, _ = normalizer(
                             translated_content,
                             entry_label=f"{filename} entry {db_entry.entry_index}",
                         )
