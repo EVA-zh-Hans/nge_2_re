@@ -3,29 +3,17 @@ Persist EVSWrapper
 """
 
 import hashlib
-import json
 import logging
-import os
-from typing import Optional
 from tqdm import tqdm
 
 from ..db import get_db
 from app.parser import tools
-from app.utils.evs import get_avatar_and_exp
 
 from ..entity.evs_entry import EVSEntry
-from ..entity.hgar import Hgar
-from ..entity.hgar_file import HgarFile
 from ..entity.sentence import Sentence
 from ..entity.translation import Translation
 
 logger = logging.getLogger(__name__)
-
-HAS_CONTENT_SECTION = (0x01, 0x8C, 0x8D, 0xA3, 0x8E, 0x95)
-
-
-def _is_cev_translatable_original(text: str) -> bool:
-    return bool(text and text.strip() and not text.isascii())
 
 
 class EVSDao:
@@ -162,207 +150,10 @@ class EVSDao:
                     evs.add_entry(entry.type, entry.param, b"")
                     continue
                 
+                # 从缓存中获取内容（O(1) 字典查询）
                 content = sentences_map.get(entry.sentence_key, b"")
-                if entry.translation:
-                    content = entry.translation
-                elif entry.sentence_key in translations_map:
+                if entry.sentence_key in translations_map:
                     content = translations_map[entry.sentence_key]
                 logger.debug("EVS content: %s", content)
                 evs.add_entry(entry.type, entry.param, content)
             return evs
-
-    @staticmethod
-    def _entry_context(evs_entry: EVSEntry) -> str:
-        if evs_entry.param and len(evs_entry.param) >= 2:
-            avatar, exp = get_avatar_and_exp(evs_entry.param[0], evs_entry.param[1])
-        else:
-            avatar, exp = f"function_{evs_entry.type}", None
-        return f"AVA: {avatar}\nEXP: {exp}"
-
-    @staticmethod
-    def export_cev_translations(output_dir: str) -> int:
-        """
-        Export CEV event translations as one JSON file per EVS.
-
-        The per-entry key uses the EVS-local entry index instead of the
-        deduplicated sentence key, so repeated originals can be translated
-        independently.
-        """
-        cev_dir = os.path.join(output_dir, "cev")
-        os.makedirs(cev_dir, exist_ok=True)
-
-        exported = 0
-        with next(get_db()) as db:
-            cev_files = (
-                db.query(Hgar.relative_path, Hgar.name, HgarFile.id, HgarFile.short_name)
-                .join(HgarFile, HgarFile.hgar_id == Hgar.id)
-                .filter(Hgar.name.like("cev%"))
-                .filter(HgarFile.short_name.like("%.evs"))
-                .order_by(Hgar.relative_path.asc(), Hgar.name.asc(), HgarFile.short_name.asc())
-                .all()
-            )
-
-            for _, _, hgar_file_id, evs_name in cev_files:
-                evs_entries = (
-                    db.query(EVSEntry)
-                    .filter(EVSEntry.hgar_file_id == hgar_file_id)
-                    .order_by(EVSEntry.id.asc())
-                    .all()
-                )
-                sentence_keys = {
-                    entry.sentence_key
-                    for entry in evs_entries
-                    if entry.sentence_key is not None
-                }
-                sentences_map = {}
-                translations_map = {}
-                if sentence_keys:
-                    sentences = db.query(Sentence).filter(Sentence.key.in_(sentence_keys)).all()
-                    translations = db.query(Translation).filter(Translation.key.in_(sentence_keys)).all()
-                    sentences_map = {sentence.key: sentence.content for sentence in sentences}
-                    translations_map = {translation.key: translation.content for translation in translations}
-
-                data = []
-                for entry_index, evs_entry in enumerate(evs_entries):
-                    if (
-                        evs_entry.sentence_key is None
-                        or evs_entry.type not in HAS_CONTENT_SECTION
-                    ):
-                        continue
-
-                    original = sentences_map.get(evs_entry.sentence_key, "")
-                    if not _is_cev_translatable_original(original):
-                        continue
-
-                    translation = evs_entry.translation or translations_map.get(
-                        evs_entry.sentence_key, ""
-                    )
-                    data.append(
-                        {
-                            "key": f"{evs_name}:{entry_index:06d}",
-                            "entry_index": entry_index,
-                            "original": original,
-                            "translation": translation,
-                            "context": EVSDao._entry_context(evs_entry),
-                        }
-                    )
-
-                output_name = evs_name[:-4] if evs_name.endswith(".evs") else evs_name
-                output_path = os.path.join(cev_dir, f"{output_name}.json")
-                with open(output_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=4, ensure_ascii=False)
-                exported += 1
-
-        return exported
-
-    @staticmethod
-    def _parse_cev_entry_index(item: dict) -> Optional[int]:
-        entry_index = item.get("entry_index")
-        if entry_index is not None:
-            try:
-                return int(entry_index)
-            except (TypeError, ValueError):
-                return None
-
-        key = item.get("key")
-        if not isinstance(key, str) or ":" not in key:
-            return None
-        try:
-            return int(key.rsplit(":", 1)[1])
-        except ValueError:
-            return None
-
-    @staticmethod
-    def import_cev_translations(input_dir: str) -> tuple[int, int]:
-        """
-        Import split CEV EVS translations from a directory of JSON files.
-
-        Returns:
-            (imported, skipped)
-        """
-        imported = 0
-        skipped = 0
-
-        if not os.path.isdir(input_dir):
-            raise FileNotFoundError(f"CEV translation directory not found: {input_dir}")
-
-        with next(get_db()) as db:
-            for root, _, files in os.walk(input_dir):
-                for file in sorted(files):
-                    if not file.endswith(".json"):
-                        continue
-
-                    file_path = os.path.join(root, file)
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                    if not isinstance(data, list):
-                        skipped += 1
-                        continue
-
-                    stem = file[:-5]
-                    evs_name = stem if stem.endswith(".evs") else f"{stem}.evs"
-                    hgar_file = (
-                        db.query(HgarFile)
-                        .join(Hgar, HgarFile.hgar_id == Hgar.id)
-                        .filter(Hgar.name.like("cev%"))
-                        .filter(HgarFile.short_name == evs_name)
-                        .first()
-                    )
-                    if hgar_file is None:
-                        skipped += len(data)
-                        logger.warning("CEV EVS not found for %s", file_path)
-                        continue
-
-                    evs_entries = (
-                        db.query(EVSEntry)
-                        .filter(EVSEntry.hgar_file_id == hgar_file.id)
-                        .order_by(EVSEntry.id.asc())
-                        .all()
-                    )
-                    sentence_keys = {
-                        entry.sentence_key
-                        for entry in evs_entries
-                        if entry.sentence_key is not None
-                    }
-                    sentences_map = {}
-                    if sentence_keys:
-                        sentences = db.query(Sentence).filter(Sentence.key.in_(sentence_keys)).all()
-                        sentences_map = {sentence.key: sentence.content for sentence in sentences}
-
-                    for item in data:
-                        if not isinstance(item, dict):
-                            skipped += 1
-                            continue
-
-                        translation = item.get("translation")
-                        if not translation:
-                            skipped += 1
-                            continue
-
-                        entry_index = EVSDao._parse_cev_entry_index(item)
-                        if entry_index is None or entry_index >= len(evs_entries) or entry_index < 0:
-                            skipped += 1
-                            continue
-
-                        evs_entry = evs_entries[entry_index]
-                        if evs_entry.sentence_key is None:
-                            skipped += 1
-                            continue
-
-                        original = item.get("original")
-                        current_original = sentences_map.get(evs_entry.sentence_key)
-                        if original is not None and current_original != original:
-                            skipped += 1
-                            logger.warning(
-                                "Original mismatch in %s at entry %s",
-                                file_path,
-                                entry_index,
-                            )
-                            continue
-
-                        evs_entry.translation = translation
-                        imported += 1
-
-            db.commit()
-
-        return imported, skipped

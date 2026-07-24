@@ -30,28 +30,18 @@ class TranslationDao:
             }
         ]
         """
-        imported = 0
-        skipped = 0
         with next(get_db()) as db:
             for d in data:
-                key = d.get("key")
-                translation_content = d.get("translation")
-                if not key or not translation_content:
-                    skipped += 1
-                    continue
-
                 # 检查是否已存在该 key
-                existing = db.query(Translation).filter(Translation.key == key).first()
+                existing = db.query(Translation).filter(Translation.key == d["key"]).first()
                 if existing:
                     # 更新已存在的记录
-                    existing.content = translation_content
+                    existing.content = d["translation"]
                 else:
                     # 创建新记录
-                    translation = Translation(key=key, content=translation_content)
+                    translation = Translation(key=d["key"], content=d["translation"])
                     db.add(translation)
-                imported += 1
             db.commit()
-        return imported, skipped
 
     @staticmethod
     def get_translation_by_key(key: str):

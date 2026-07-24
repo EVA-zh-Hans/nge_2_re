@@ -100,7 +100,6 @@ check_trans:
 import_trans: generate_memtalk_templates
 	@echo "Importing translations..."
 	$(PYTHON_MAIN) --import_translation '$(DOWNLOAD_DIR)/evs_trans.json'
-	$(PYTHON_MAIN) --import_cev_translation '$(DOWNLOAD_DIR)/utf8/EVS/cev'
 	$(PYTHON_MAIN) --import_translation '$(DOWNLOAD_DIR)/utf8/free/info.json'
 	$(PYTHON_MAIN) --import_translation '$(DOWNLOAD_DIR)/utf8/free/tuto.json'
 	$(PYTHON_MAIN) --import_translation '$(DOWNLOAD_DIR)/utf8/game/btimtext.json'
