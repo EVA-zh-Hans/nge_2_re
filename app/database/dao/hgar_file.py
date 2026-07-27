@@ -127,7 +127,6 @@ class HGARFileDao:
             
             # 第二阶段：批量插入 HgarFile 记录（使用手动生成 ID，消除查询开销）
             hgar_file_mappings = []
-            hgar_file_id_map = {}  # (short_name, encoded_identifier) -> id 映射
             
             # 优化：手动生成 ID（client-side IDs），避免插入后查询
             # 1. 获取当前最大 ID（仅查询一次）
@@ -142,6 +141,7 @@ class HGARFileDao:
                 # 手动分配 ID
                 hgar_file_id = current_id
                 current_id += 1
+                data['hgar_file_id'] = hgar_file_id
                 
                 # 构造映射，明确写入 ID
                 hgar_file_mappings.append({
@@ -157,10 +157,6 @@ class HGARFileDao:
                     'hgpt_key': data['hgpt_key'],  # 关联 HGPT
                 })
                 
-                # 存入映射表，后续直接使用，完全不需要查询数据库
-                key = (short_name, encoded_id)
-                hgar_file_id_map[key] = hgar_file_id
-            
             # 使用 bulk_insert_mappings 批量插入（包含手动分配的 ID）
             if hgar_file_mappings:
                 db.bulk_insert_mappings(HgarFile, hgar_file_mappings)
@@ -175,16 +171,10 @@ class HGARFileDao:
                 short_name = data['short_name']
                 content = data['content']
                 evs_wrapper = data['evs_wrapper']
-                file = data['file']
                 
-                # 直接从内存映射中获取 ID（无需查询数据库）
-                encoded_id = file.encoded_identifier if hasattr(file, 'encoded_identifier') else None
-                key = (short_name, encoded_id)
-                hgar_file_id = hgar_file_id_map.get(key)
-                
-                if hgar_file_id is None:
-                    logger.warning("  [HGARFile] Could not find ID for %s (encoded_id: %s)", short_name, encoded_id)
-                    continue
+                # IDs are attached by archive position. Looking them up by
+                # name/identifier collapses valid duplicate HGAR entries.
+                hgar_file_id = data['hgar_file_id']
                 
                 if short_name.endswith(".evs"):
                     # 收集 EVS 数据，稍后批量处理
