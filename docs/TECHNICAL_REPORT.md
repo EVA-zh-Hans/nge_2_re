@@ -4,7 +4,7 @@
 
 This repository implements a localization patch production pipeline for the PSP game *Neon Genesis Evangelion 2: Another Cases* / *The Created World*. Its main technical goal is to make a Chinese localization patch reproducible from a clean game ISO, translation data, edited image resources, and checked-in tooling.
 
-The project combines reverse-engineered binary parsers, a SQLite-backed asset database, translation import/export utilities, PSP-side runtime patching code, and ISO repacking scripts. The preferred operator interface is the top-level `Makefile`, which orchestrates the full workflow from ISO extraction through final xdelta patch generation. A Tkinter GUI wraps common operations for non-programmer users.
+The project combines reverse-engineered binary parsers, a SQLite-backed asset database, translation import/export utilities, PSP-side runtime patching code, and ISO repacking scripts. The preferred operator interface is the top-level `Makefile`, which orchestrates the full workflow from ISO extraction through final xdelta patch generation.
 
 The implementation is primarily Python, with PSP plugin code in C/assembly and a partial C++ parser implementation for performance experiments and cross-checking.
 
@@ -36,7 +36,6 @@ The `app/` directory contains the main Python implementation:
 - `app/database/` defines SQLAlchemy models and DAO classes for imported assets.
 - `app/parser/tools/` contains binary parsers and serializers for HGAR, HGPT, TEXT, BIND, EVS, PNG-related helpers, compression, and common encoding logic.
 - `app/elf_patch/patcher.py` generates `EBTRANS.BIN`, the runtime translation table consumed by the PSP patch.
-- `app/gui/` provides the Tkinter GUI and workflow wrappers.
 
 The CLI exposes focused import/export actions instead of a single monolithic command. This design lets the Makefile compose the pipeline while still allowing developers to debug individual stages.
 
@@ -315,18 +314,6 @@ uv run -m app.cli.main
 
 It supports import/export operations for HGAR, EVS, translations, images, TEXT, BIND, and EBOOT translation resources. This is useful for isolating failed stages during development.
 
-### 8.3 GUI Interface
-
-The GUI entry point is:
-
-```sh
-python3 run_gui.py
-```
-
-The GUI wraps database initialization, translation download, resource import/export, image operations, TEXT/BIND operations, and EBOOT translation generation. It uses background threads and a log panel so long-running operations do not block the interface.
-
-One security caveat is that the GUI currently persists the ParaTranz token in `settings.json`. That file should not be committed or distributed with secrets.
-
 ## 9. Development Environment
 
 The project expects Python `>=3.9` and uses `uv` for dependency management. Key Python dependencies include:
@@ -342,7 +329,6 @@ The project expects Python `>=3.9` and uses `uv` for dependency management. Key 
 Development dependencies include:
 
 - `ruff`
-- `pyinstaller`
 
 For PSP-side work, the PSPDEV toolchain is required. Docker support is provided to make PSP builds and CI more stable.
 
@@ -351,7 +337,7 @@ Recommended local setup:
 ```sh
 uv venv
 uv sync
-uv run -m pytest
+uv run python -m unittest discover -s tests -v
 uv run ruff check .
 ```
 
@@ -360,7 +346,6 @@ uv run ruff check .
 The repository includes GitHub Actions workflows for:
 
 - Building the PSP translation patch inside a custom Docker environment.
-- Building GUI applications on Linux, Windows, and macOS with PyInstaller.
 - Mirroring the repository to Codeberg.
 
 The main build workflow:
@@ -372,15 +357,13 @@ The main build workflow:
 - Displays generated metadata.
 - Uploads xdelta patches and metadata artifacts.
 
-The GUI workflow builds platform-specific distributable archives and creates a GitHub release when a version tag is pushed.
-
 ## 11. Testing and Quality Controls
 
 The documented minimum checks are:
 
 ```sh
 uv run ruff check .
-uv run -m pytest
+uv run python -m unittest discover -s tests -v
 ```
 
 Current tests cover selected model and encoding behavior, while profiling scripts exist for import/export performance analysis. The strongest practical validation remains stage-level rebuild testing because the project manipulates complex binary formats where round-trip correctness is essential.
@@ -400,7 +383,7 @@ Common failure classes include:
 
 - Missing ISO files in `temp/`.
 - Missing `AUTH_KEY` for translation download or metadata statistics.
-- SQLite lock contention from GUI and CLI processes running simultaneously.
+- SQLite lock contention from concurrent import or export processes.
 - Missing PSPDEV, `pspdecrypt`, `xdelta3`, or other external tools.
 - Translated text that cannot be encoded into the custom EVA Shift-JIS mapping.
 - Translated text that exceeds binary/runtime space constraints.
@@ -425,7 +408,7 @@ The PSP plugin and EBOOT patching logic depend on fixed runtime assumptions. Add
 
 ### 13.4 Secret Handling
 
-`AUTH_KEY` and GUI-stored ParaTranz tokens are operational secrets. They must remain outside committed source, logs, artifacts, and documentation examples.
+`AUTH_KEY` is an operational secret. It must remain outside committed source, logs, artifacts, and documentation examples.
 
 ### 13.5 Generated Artifact Noise
 
@@ -438,9 +421,8 @@ The repository uses several generated or cache-heavy directories. Build artifact
 3. Add a preflight command that checks ISO presence, required tools, writable output paths, and token availability before `make full_build`.
 4. Keep generated plugin assets reproducible with `make check-generated` in CI when PSP toolchain availability permits.
 5. Document the expected JSON schemas for EVS, TEXT, BIND, and EBOOT translation files.
-6. Add `.gitignore` coverage for local GUI settings if not already present, especially `settings.json`.
-7. Consider migration tooling for the SQLite schema if the database becomes long-lived across versions.
-8. Preserve stage-level Makefile targets because they are essential for debugging large patch builds.
+6. Consider migration tooling for the SQLite schema if the database becomes long-lived across versions.
+7. Preserve stage-level Makefile targets because they are essential for debugging large patch builds.
 
 ## 15. Conclusion
 
