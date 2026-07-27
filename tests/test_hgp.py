@@ -1,6 +1,8 @@
 import io
 import unittest
 
+from app.database.dao.hgpt import HgptDao
+from app.parser.tools import png
 from app.parser.tools.hgp import (
     DisplayInfo,
     HgptHeader,
@@ -48,6 +50,24 @@ class RgbaTileProcessorTests(unittest.TestCase):
         self.assertEqual(decoded.display_info.height, display.height)
         self.assertEqual(decoded.palette, None)
         self.assertEqual(decoded.content, pixels)
+
+    def test_rgba_image_exports_to_png(self):
+        display = DisplayInfo(width=2, height=2)
+        pixels = [
+            (255, 0, 0, 255),
+            (0, 255, 0, 128),
+            (0, 0, 255, 64),
+            (255, 255, 255, 0),
+        ]
+
+        encoded = HgptDao._export_to_png(
+            HgptImage(HgptHeader(), display, pixels)
+        )
+        width, height, rows, info = png.Reader(bytes=encoded).read()
+
+        self.assertEqual((width, height), (2, 2))
+        self.assertTrue(info["alpha"])
+        self.assertEqual([list(row) for row in rows][0], [255, 0, 0, 255, 0, 255, 0, 128])
 
 
 if __name__ == "__main__":

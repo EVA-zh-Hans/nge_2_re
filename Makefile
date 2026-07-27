@@ -41,10 +41,12 @@ help:
 	@echo "  make inject_staff_roll   - Inject staff21.hpt into exported staff.har"
 	@echo "  make import_trans        - Import downloaded translations to DB"
 	@echo "  make export_all          - Export all game files (text, hgar, eboot)"
+	@echo "  make stream_export       - Export translated resources without SQLite"
 	@echo "  make gen_metadata        - Generate patch metadata (JSON and image)"
 	@echo "  make patch_iso           - Create the patched ISO and xdelta"
 	@echo "  make patch_all_ids       - Generate patches for all GAME_IDS (00061 & 00064)"
 	@echo "  make full_build          - Run the complete pipeline"
+	@echo "  make stream_full_build   - Build patches with the streaming resource path"
 	@echo "  make clean               - Clean build artifacts"
 
 # ==========================================
@@ -154,6 +156,15 @@ export_eboot_trans:
 
 export_all: export_text export_bind inject_staff_roll export_eboot_trans
 
+stream_export:
+	@echo "Streaming translated resources without SQLite..."
+	$(UV_RUN) -m app.pipeline.stream_build \
+		--source $(USRDIR) \
+		--output $(EXPORT_USRDIR) \
+		--downloads $(DOWNLOAD_DIR) \
+		--images resources/trans_pic/trans \
+		--report $(BUILD_DIR)/resource-report.json
+
 # ==========================================
 # Tools & Plugins Build
 # ==========================================
@@ -238,6 +249,17 @@ full_build:
 	$(MAKE) gen_metadata
 	$(MAKE) patch_all_ids
 
+stream_full_build:
+	$(MAKE) extract_iso
+	$(MAKE) generate_memtalk_templates
+	$(MAKE) stream_export
+	$(MAKE) export_eboot_trans
+	$(MAKE) plugin
+	$(MAKE) decrypt_eboot
+	$(MAKE) copy_font
+	$(MAKE) gen_metadata
+	$(MAKE) patch_all_ids
+
 rebuild:
 	$(MAKE) download_trans
 	$(MAKE) import_trans
@@ -262,7 +284,7 @@ clean:
 	# Optional: Clean plugin and tools
 	# $(MAKE) -C plugin clean
 
-.PHONY: generate_staff_roll preview_staff_roll inject_staff_roll
+.PHONY: generate_staff_roll preview_staff_roll inject_staff_roll stream_export
 	# $(MAKE) -C third_party/pspdecrypt clean
 
 # Mark targets as PHONY (not real files)
@@ -271,4 +293,4 @@ clean:
         export_text export_bind export_hgar export_eboot_trans export_all \
         plugin pgftool pspdecrypt \
         extract_iso decrypt_eboot copy_font repack_iso gen_xdelta gen_metadata patch_iso \
-        full_build rebuild patch_all_ids patch_id_% clean
+        full_build stream_full_build rebuild patch_all_ids patch_id_% clean
