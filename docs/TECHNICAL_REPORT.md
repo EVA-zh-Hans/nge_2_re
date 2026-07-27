@@ -6,7 +6,7 @@ This repository implements a localization patch production pipeline for the PSP 
 
 The project combines reverse-engineered binary parsers, a SQLite-backed asset database, translation import/export utilities, PSP-side runtime patching code, and ISO repacking scripts. The preferred operator interface is the top-level `Makefile`, which orchestrates the full workflow from ISO extraction through final xdelta patch generation.
 
-The implementation is primarily Python, with PSP plugin code in C/assembly and a partial C++ parser implementation for performance experiments and cross-checking.
+The resource tooling is implemented in Python, while the PSP plugin uses C and assembly.
 
 ## 2. Project Scope
 
@@ -108,10 +108,6 @@ The `scripts/` directory contains support tools for:
 - OCR/image-related experiments.
 
 `scripts/gen_metadata.py` produces build metadata in JSON and PNG form. Metadata includes Git commit information, submodule versions, optional ParaTranz statistics, and a PSP-resolution visual summary intended for inclusion in the patched game tree.
-
-### 3.6 C++ Parser Work
-
-The `cpp/` directory contains a C++ implementation of part of the parser logic, notably HGPT-related code. It appears to serve as a performance and correctness comparison path for selected binary parsing tasks. Any changes to shared binary formats should keep the Python and C++ implementations aligned.
 
 ## 4. Build and Release Pipeline
 
@@ -398,21 +394,17 @@ The project supports safe recovery by rerunning individual Makefile targets rath
 
 The project depends on reverse-engineered binary layouts. Small changes to field order, alignment, padding, compression flags, or offset bases can produce files that parse locally but fail in game. Parser and serializer changes should therefore be treated as high risk.
 
-### 13.2 Cross-Language Consistency
-
-Some parsing logic exists in both Python and C++. Any shared HGPT/HGAR behavior must remain consistent across implementations.
-
-### 13.3 Runtime Patch Fragility
+### 13.2 Runtime Patch Fragility
 
 The PSP plugin and EBOOT patching logic depend on fixed runtime assumptions. Address changes, loader behavior changes, or font/encoding divergence can break text rendering or game startup.
 
-### 13.4 Secret Handling
+### 13.3 Secret Handling
 
 `AUTH_KEY` is an operational secret. It must remain outside committed source, logs, artifacts, and documentation examples.
 
-### 13.5 Generated Artifact Noise
+### 13.4 Generated Artifact Noise
 
-The repository uses several generated or cache-heavy directories. Build artifacts under `build/`, `build_cpp/`, `temp/`, and `logs/` should not be treated as source changes unless a task explicitly targets them.
+The repository uses several generated or cache-heavy directories. Build artifacts under `build/`, `temp/`, and `logs/` should not be treated as source changes unless a task explicitly targets them.
 
 ## 14. Recommendations
 
