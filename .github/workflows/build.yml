@@ -182,8 +182,8 @@ jobs:
             echo "⬇️ Downloading Translations..."
             make download_trans
             
-            echo "🚀 Starting Full Build..."
-            make full_build
+            echo "🚀 Starting Stream Full Build..."
+            make stream_full_build
           '
 
     # 7. Display metadata generated during build
