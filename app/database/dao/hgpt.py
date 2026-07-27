@@ -321,10 +321,11 @@ class HgptDao:
                 compression=1,
                 filter_type=0
             )
-            rows = [
-                hgpt_image.content[i:i + hgpt_image.display_info.width]
-                for i in range(0, len(hgpt_image.content), hgpt_image.display_info.width)
-            ]
+            rows = []
+            width = hgpt_image.display_info.width
+            for offset in range(0, len(hgpt_image.content), width):
+                pixels = hgpt_image.content[offset:offset + width]
+                rows.append([channel for pixel in pixels for channel in pixel])
         
         w.write(output, rows)
         return output.getvalue()
