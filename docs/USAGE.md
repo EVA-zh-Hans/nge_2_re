@@ -59,49 +59,41 @@
 
 5. 输出结果在 `build` 目录下，例如 `build/ULJS00064_patched.iso` 和 `build/ULJS00064_patch.xdelta`。
 
-## 运行方式（GUI / 命令行）
+## 运行方式（命令行）
 
-- GUI：直接运行项目根目录下的 `run_gui.py`：
+使用 Makefile 中封装的任务或直接使用 `uv run -m` / `python3 -m` 调用模块。
+
+常见示例：
+
+- 下载并合并 ParaTranz 翻译：
 
   ```sh
-  python3 run_gui.py
+  AUTH_KEY=<your-api-key> make download_trans
   ```
 
-  该脚本会启动图形界面（依赖项目内 `app.gui.main`）。
+- 导入下载的翻译：
 
-- 命令行：使用 Makefile 中封装的任务或直接使用 `uv run -m` / `python3 -m` 调用模块。
+  ```sh
+  make import_trans
+  ```
 
-  常见示例：
+- 导出游戏资源：
 
-  - 下载并合并 ParaTranz 翻译：
+  ```sh
+  make export_all
+  ```
 
-    ```sh
-    AUTH_KEY=<your-api-key> make download_trans
-    ```
+- 仅重打 ISO（假如已经生成了替换后的游戏文件）：
 
-  - 导入下载的翻译：
+  ```sh
+  make repack_iso
+  ```
 
-    ```sh
-    make import_trans
-    ```
+- 完整流水线（从 ISO 抽取到生成补丁）：
 
-  - 导出游戏资源：
-
-    ```sh
-    make export_all
-    ```
-
-  - 仅重打 ISO（假如已经生成了替换后的游戏文件）：
-
-    ```sh
-    make repack_iso
-    ```
-
-  - 完整流水线（从 ISO 抽取到生成补丁）：
-
-    ```sh
-    make full_build
-    ```
+  ```sh
+  make full_build
+  ```
 
 ## 常用 Make 目标说明
 

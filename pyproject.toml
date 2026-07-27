@@ -20,6 +20,5 @@ package_mode = false
 
 [dependency-groups]
 dev = [
-    "pyinstaller>=6.17.0",
     "ruff>=0.12.0",
 ]

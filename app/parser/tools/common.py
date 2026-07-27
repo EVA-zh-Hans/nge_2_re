@@ -8,7 +8,7 @@ from functools import lru_cache
 
 from app.utils.map import CUSTOM_ENCODE_MAP
 
-# Check encoding only if stdout is available (not in GUI mode or when redirected)
+# Check encoding only when stdout exposes an encoding.
 if sys.stdout and hasattr(sys.stdout, 'encoding') and sys.stdout.encoding:
     if (sys.stdout.encoding.lower().strip().replace('-', '').replace(' ', '') != 'utf8'):
         print("Your system\'s default terminal/screen encoding is not UTF-8.\n"

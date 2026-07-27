@@ -110,7 +110,6 @@
 ```
 app/
 ├─ cli/      # 主程序
-├─ gui/      # 图形化程序
 ├─ database/      # SQL数据库定义
 ├─ elf_patch/      # 生成 SJIS 文本翻译文件 EBTRANS.BIN
 ├─ parser/tools/   # 资源解析脚本（修改自原仓库）
@@ -145,7 +144,6 @@ scripts/
 - [x] 自动导入导出 HGAR
 - [x] 自动导入导出 TEXT 资源
 - [x] 自动导入导出 BIND 资源
-- [x] GUI 汉化工具
 - [x] 使用视觉大模型进行图片文字识别
 - [ ] 修改游戏贴图
 - [x] 自动导出贡献图表
