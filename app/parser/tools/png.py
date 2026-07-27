@@ -730,11 +730,11 @@ class BaseFilter(object):
 iBaseFilter = BaseFilter  # 'i' means 'internal'
 try:
     BaseFilter = _rel_import('pngfilters', 'BaseFilter')
-except:
+except Exception as exc:
     # Whatever happens we could use internal part
-    if sys.exc_info()[0] is not ImportError:
+    if not isinstance(exc, ImportError):
         logging.error("Error during import of compiled filters!")
-        logging.error(sys.exc_info()[1])
+        logging.error(exc)
         logging.error("Fallback to pure python mode!")
     BaseFilter = iBaseFilter
 

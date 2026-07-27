@@ -20,6 +20,19 @@ class TranslationDao:
             return translation
 
     @staticmethod
+    def prepare_translations(data):
+        translations = {}
+        skipped = 0
+        for item in data:
+            key = item.get("key")
+            content = item.get("translation")
+            if not key or not content:
+                skipped += 1
+                continue
+            translations[key] = content
+        return translations, skipped
+
+    @staticmethod
     def save_translations(data):
         """
         翻译JSON 结构：
@@ -30,28 +43,30 @@ class TranslationDao:
             }
         ]
         """
-        imported = 0
-        skipped = 0
+        translations, skipped = TranslationDao.prepare_translations(data)
         with next(get_db()) as db:
-            for d in data:
-                key = d.get("key")
-                translation_content = d.get("translation")
-                if not key or not translation_content:
-                    skipped += 1
-                    continue
+            existing_by_key = {}
+            keys = list(translations)
+            for start in range(0, len(keys), 900):
+                rows = (
+                    db.query(Translation)
+                    .filter(Translation.key.in_(keys[start:start + 900]))
+                    .order_by(Translation.id)
+                    .all()
+                )
+                for row in rows:
+                    existing_by_key.setdefault(row.key, []).append(row)
 
-                # 检查是否已存在该 key
-                existing = db.query(Translation).filter(Translation.key == key).first()
+            for key, content in translations.items():
+                existing = existing_by_key.get(key, [])
                 if existing:
-                    # 更新已存在的记录
-                    existing.content = translation_content
+                    existing[0].content = content
+                    for duplicate in existing[1:]:
+                        db.delete(duplicate)
                 else:
-                    # 创建新记录
-                    translation = Translation(key=key, content=translation_content)
-                    db.add(translation)
-                imported += 1
+                    db.add(Translation(key=key, content=content))
             db.commit()
-        return imported, skipped
+        return len(translations), skipped
 
     @staticmethod
     def get_translation_by_key(key: str):

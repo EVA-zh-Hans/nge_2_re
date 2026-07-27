@@ -152,23 +152,29 @@ class TileProcessor(ABC):
         # 计算瓦片相关参数
         tiles_per_row = storage_width // tile_w
         tiles_per_col = storage_height // tile_h
-        tile_size = tile_w * tile_h
-        
-        # 重塑为瓦片形状：(tiles_per_col, tiles_per_row, tile_h, tile_w)
-        # 每个瓦片是 tile_h x tile_w
-        tiled_reshaped = tiled_array.reshape(tiles_per_col, tiles_per_row, tile_h, tile_w)
+        pixel_shape = tiled_array.shape[1:]
+
+        # RGBA data has a trailing channel dimension which must not take part
+        # in the tile-coordinate reshape.
+        tiled_reshaped = tiled_array.reshape(
+            tiles_per_col, tiles_per_row, tile_h, tile_w, *pixel_shape
+        )
         
         # 转置轴以获得正确的布局：(tiles_per_col, tile_h, tiles_per_row, tile_w)
-        transposed = tiled_reshaped.transpose(0, 2, 1, 3)
+        transposed = tiled_reshaped.transpose(
+            0, 2, 1, 3, *range(4, tiled_reshaped.ndim)
+        )
         
         # 重塑为最终的图像形状：(storage_height, storage_width)
-        untiled = transposed.reshape(storage_height, storage_width)
+        untiled = transposed.reshape(storage_height, storage_width, *pixel_shape)
         
         # 裁剪到显示尺寸
         result = untiled[:display_height, :display_width]
         
         # 转换回列表（保持接口一致性）
-        return result.flatten().tolist()
+        if pixel_shape:
+            return [tuple(pixel) for pixel in result.reshape(-1, *pixel_shape).tolist()]
+        return result.reshape(-1).tolist()
 
     def tile(self, content: list, storage_width: int, storage_height: int) -> list:
         """将线性的像素数据排列为瓦片数据（用于写入文件）。使用 NumPy 优化。"""
@@ -190,12 +196,16 @@ class TileProcessor(ABC):
         else:
             content_array = content
         
-        # 重塑为 2D 图像
-        image = content_array.reshape(display_height, display_width)
+        pixel_shape = content_array.shape[1:]
+
+        # 重塑为图像，同时保留 RGBA 等像素的尾随通道维。
+        image = content_array.reshape(display_height, display_width, *pixel_shape)
         
         # 填充到存储尺寸
         if storage_height > display_height or storage_width > display_width:
-            padded = np.zeros((storage_height, storage_width), dtype=image.dtype)
+            padded = np.zeros(
+                (storage_height, storage_width, *pixel_shape), dtype=image.dtype
+            )
             padded[:display_height, :display_width] = image
         else:
             padded = image
@@ -205,13 +215,18 @@ class TileProcessor(ABC):
         tiles_per_col = storage_height // tile_h
         
         # 重塑为瓦片布局：(tiles_per_col, tile_h, tiles_per_row, tile_w)
-        reshaped = padded.reshape(tiles_per_col, tile_h, tiles_per_row, tile_w)
+        reshaped = padded.reshape(
+            tiles_per_col, tile_h, tiles_per_row, tile_w, *pixel_shape
+        )
         
         # 转置轴以获得瓦片格式：(tiles_per_col, tiles_per_row, tile_h, tile_w)
-        transposed = reshaped.transpose(0, 2, 1, 3)
+        transposed = reshaped.transpose(0, 2, 1, 3, *range(4, reshaped.ndim))
         
         # 展平为一维数组
-        tiled = transposed.flatten()
+        if pixel_shape:
+            tiled = transposed.reshape(-1, *pixel_shape)
+        else:
+            tiled = transposed.reshape(-1)
         
         # 转换回列表
         return tiled.tolist()

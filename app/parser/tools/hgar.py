@@ -388,8 +388,14 @@ class HGArchive(object):
 
             for file in self.files:
                 # Write short name
-                # FIXME: Need Binary
-                short_name_name, short_name_extension = (file.short_name.encode('ascii') + b'.   ').split(b'.', 1)
+                short_name = file.short_name
+                if isinstance(short_name, str):
+                    short_name = short_name.encode('ascii')
+                short_name_parts = short_name.split(b'.', 1)
+                short_name_name = short_name_parts[0]
+                short_name_extension = (
+                    short_name_parts[1] if len(short_name_parts) == 2 else b''
+                )
                 formatted_short_name = (short_name_name + b' ' * 8)[0:8] + b'.' + (short_name_extension + b' ' * 3)[0:3] 
                 f.write(formatted_short_name)
 
