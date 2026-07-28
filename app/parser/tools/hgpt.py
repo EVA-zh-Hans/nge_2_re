@@ -8,8 +8,13 @@
 
 import os
 import json
-import png
-import common
+
+try:
+    from . import common
+    from .pillow_png import read_png, write_indexed_png, write_rgb_png, write_rgba_png
+except ImportError:
+    import common
+    from pillow_png import read_png, write_indexed_png, write_rgb_png, write_rgba_png
 
 def decode_alpha(encoded_alpha):
     return min(encoded_alpha << 1, 0xFF)
@@ -36,8 +41,6 @@ class HgptWrapper(object):
 
     def open(self, file_path):
         with open(file_path, 'rb') as f:
-            file_size = common.get_file_size(f)
-
             # Read magic header
             magic_number = f.read(4).decode('ascii', 'ignore')
             if magic_number != 'HGPT':
@@ -64,7 +67,7 @@ class HgptWrapper(object):
 
             # ff ff ff ff in pictures with extended header 
             # 00 00 00 00 in pictures w/o extended header 
-            unknown_two = common.read_uint32(f)
+            common.read_uint32(f)
             
             # Load divisions
             if has_extended_header:
@@ -534,20 +537,21 @@ class HgptWrapper(object):
 
             # Save resulting canvas
             with open(output_path_helper, 'wb') as f:
-                pw = png.Writer(self.width, self.height)
-                flattened_helper_data = [color_channel for pixel in canvas for color_channel in pixel]
-                pw.write_array(f, flattened_helper_data)
+                f.write(write_rgb_png(self.width, self.height, canvas))
         
         # Output
         with open(output_path_picture, 'wb') as f:
             if len(self.palette) == 0:
-                pw = png.Writer(self.width, self.height, alpha=True)
-                flattened_image_data = [color_channel for pixel in self.content for color_channel in pixel]
-                pw.write_array(f, flattened_image_data)
-                
+                f.write(write_rgba_png(self.width, self.height, self.content))
             else:
-                pw = png.Writer(self.width, self.height, palette=self.palette)
-                pw.write_array(f, self.content)
+                f.write(
+                    write_indexed_png(
+                        self.width,
+                        self.height,
+                        self.content,
+                        self.palette,
+                    )
+                )
 
     def import_hgpt(self, file_path):
 
@@ -566,8 +570,10 @@ class HgptWrapper(object):
 
                 try:
                     metadata = json.loads(metadata.decode('utf-8'))
-                except:
-                    raise Exception('File has invalid JSON data: %s' % input_path_metadata)
+                except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                    raise Exception(
+                        'File has invalid JSON data: %s' % input_path_metadata
+                    ) from error
 
         # Set defaults
         self.has_extended_header = metadata.get('has_extended_header', False)
@@ -581,12 +587,11 @@ class HgptWrapper(object):
         palette_total = metadata.get('palette_total', 0)
 
         # Open picture
-        pr = png.Reader(filename=input_path_picture)
-        pic = pr.read()
+        decoded = read_png(input_path_picture)
 
         # Check dimensions for changes
-        new_width = pic[0]
-        new_height = pic[1]
+        new_width = decoded.width
+        new_height = decoded.height
 
         if new_width != self.width or new_height != self.height:
             print('# Warning: Picture dimensions have changed, old: (%s x %s), new: (%s x %s)' % (self.width, self.height, new_width, new_height))
@@ -595,7 +600,7 @@ class HgptWrapper(object):
         self.height = new_height
 
         # Check palette for changes
-        new_palette = pic[3].get('palette', [])
+        new_palette = list(decoded.palette or [])
 
         if palette_total != len(new_palette):
             print('# Warning: Picture palette count has changed, old: %s, new %s' % (palette_total, len(new_palette)))
@@ -612,25 +617,9 @@ class HgptWrapper(object):
 
         # Load content
         if len(new_palette) == 0:
-            self.content = []
-            color_channel_buffer = [0] * 4
-            color_channel_buffer[3] = 0xFF
-            i = 0
-            for row in pic[2]:
-                for color_channel in row:
-                    color_channel_buffer[i] = color_channel
-                    i += 1
-
-                    if (pic[3]['alpha'] and i == 4) or (not pic[3]['alpha'] and i == 3):
-                        self.content.append((
-                            color_channel_buffer[0],
-                            color_channel_buffer[1],
-                            color_channel_buffer[2],
-                            color_channel_buffer[3]))
-                        i = 0
-
+            self.content = decoded.rgba_pixels()
         else:
-            self.content = [c for row in pic[2] for c in row]
+            self.content = list(decoded.pixels)
 
 if __name__ == '__main__':
     import sys

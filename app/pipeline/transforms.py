@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import io
 import struct
-import subprocess
-import tempfile
 import zlib
-from pathlib import Path
 
-from app.parser.tools import hgp, png
+from app.parser.tools import hgp
 from app.parser.tools.evs import EvsWrapper
 from app.parser.tools.info_text import normalize_info_text, normalize_tuto_text
+from app.parser.tools.pillow_png import quantize_png, read_png
 from app.parser.tools.text import TextArchive
 
 from .catalog import ImageOverride, TranslationCatalog
@@ -103,45 +101,35 @@ def transform_evs(
 
 def rebuild_hgpt(original: bytes, override: ImageOverride) -> bytes:
     image = hgp.HgptReader(io.BytesIO(original)).read()
-    translated_png = _normalize_png_format(
-        override.path.read_bytes(),
-        target_palette_size=len(image.palette) if image.palette else None,
-    )
-    reader = png.Reader(bytes=translated_png)
-    width, height, rows, info = reader.read()
-    if (width, height) != (image.display_info.width, image.display_info.height):
+    target_palette_size = len(image.palette) if image.palette else None
+    raw = override.path.read_bytes()
+    translated = read_png(raw)
+    if target_palette_size is not None and not translated.is_indexed:
+        translated = read_png(quantize_png(raw, target_palette_size))
+
+    if (translated.width, translated.height) != (
+        image.display_info.width,
+        image.display_info.height,
+    ):
         raise ValueError(
             f"translated image size mismatch for {override.path}: expected "
-            f"{image.display_info.width}x{image.display_info.height}, got {width}x{height}"
+            f"{image.display_info.width}x{image.display_info.height}, got "
+            f"{translated.width}x{translated.height}"
         )
 
     palette = None
-    content = []
-    if "palette" in info:
-        colors = [
-            (color[0], color[1], color[2], color[3] if len(color) > 3 else 255)
-            for color in info["palette"]
-        ]
+    if target_palette_size is not None:
+        if translated.palette is None:
+            raise ValueError(f"failed to quantize translated image: {override.path}")
+        colors = list(translated.palette)
         if 0 < len(colors) < 16:
             colors.extend([(0, 0, 0, 255)] * (16 - len(colors)))
         elif 16 < len(colors) < 256:
             colors.extend([(0, 0, 0, 255)] * (256 - len(colors)))
         palette = hgp.Palette(colors)
-        content = [pixel for row in rows for pixel in row]
+        content = list(translated.pixels)
     else:
-        pixel_depth = 4 if info.get("alpha") else 3
-        if info.get("greyscale"):
-            raise ValueError(f"translated image must be RGB, RGBA, or indexed: {override.path}")
-        for row in rows:
-            for index in range(0, len(row), pixel_depth):
-                content.append(
-                    (
-                        row[index],
-                        row[index + 1],
-                        row[index + 2],
-                        row[index + 3] if pixel_depth == 4 else 255,
-                    )
-                )
+        content = translated.rgba_pixels()
 
     rebuilt = hgp.HgptImage(
         header=image.header,
@@ -152,92 +140,4 @@ def rebuild_hgpt(original: bytes, override: ImageOverride) -> bytes:
     )
     output = io.BytesIO()
     hgp.HgptWriter(rebuilt).write(output)
-    return output.getvalue()
-
-
-def _normalize_png_format(raw: bytes, target_palette_size: int | None) -> bytes:
-    reader = png.Reader(bytes=raw)
-    _, _, _, info = reader.read()
-    is_palette = "palette" in info
-    if target_palette_size is not None and not is_palette:
-        return _convert_rgba_to_palette(raw, target_palette_size)
-    if target_palette_size is None and is_palette:
-        return _convert_palette_to_rgba(raw)
-    return raw
-
-
-def _convert_rgba_to_palette(raw: bytes, palette_size: int) -> bytes:
-    with tempfile.TemporaryDirectory(prefix="nge2-pngquant-") as directory:
-        input_path = Path(directory) / "input.png"
-        output_path = Path(directory) / "output.png"
-        input_path.write_bytes(raw)
-        try:
-            subprocess.run(
-                [
-                    "pngquant",
-                    "--force",
-                    "--speed",
-                    "1",
-                    str(palette_size),
-                    str(input_path),
-                    "--output",
-                    str(output_path),
-                    "-v",
-                ],
-                check=False,
-                capture_output=True,
-                timeout=30,
-            )
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            pass
-        if output_path.is_file():
-            return output_path.read_bytes()
-    return _convert_rgba_to_palette_fallback(raw, palette_size)
-
-
-def _convert_rgba_to_palette_fallback(raw: bytes, palette_size: int) -> bytes:
-    reader = png.Reader(bytes=raw)
-    width, height, rows, info = reader.read()
-    depth = 4 if info.get("alpha") else 3
-    pixels = []
-    for row in rows:
-        for index in range(0, len(row), depth):
-            pixels.append(
-                (
-                    row[index],
-                    row[index + 1],
-                    row[index + 2],
-                    row[index + 3] if depth == 4 else 255,
-                )
-            )
-    colors = []
-    color_indexes = {}
-    for pixel in pixels:
-        if pixel not in color_indexes and len(colors) < palette_size:
-            color_indexes[pixel] = len(colors)
-            colors.append(pixel)
-    colors.extend([(0, 0, 0, 255)] * (palette_size - len(colors)))
-    indexes = [color_indexes.get(pixel, 0) for pixel in pixels]
-    output = io.BytesIO()
-    writer = png.Writer(width, height, palette=colors, bitdepth=8)
-    writer.write(
-        output,
-        [indexes[index:index + width] for index in range(0, len(indexes), width)],
-    )
-    return output.getvalue()
-
-
-def _convert_palette_to_rgba(raw: bytes) -> bytes:
-    reader = png.Reader(bytes=raw)
-    width, height, rows, info = reader.read()
-    palette = info["palette"]
-    rgba_rows = []
-    for row in rows:
-        rgba_row = []
-        for index in row:
-            color = palette[index]
-            rgba_row.extend((*color[:3], color[3] if len(color) > 3 else 255))
-        rgba_rows.append(rgba_row)
-    output = io.BytesIO()
-    png.Writer(width, height, greyscale=False, alpha=True).write(output, rgba_rows)
     return output.getvalue()
