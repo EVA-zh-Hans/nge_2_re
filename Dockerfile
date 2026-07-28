@@ -1,4 +1,5 @@
-FROM --platform=linux/amd64 ubuntu:24.04
+ARG PSPDEV_BUILD_PLATFORM=linux/amd64
+FROM --platform=${PSPDEV_BUILD_PLATFORM} ubuntu:24.04
 
 LABEL maintainer="xeonliu"
 LABEL description="Translation Project for PSP Evangelion 2: Another Cases with custom PSPDEV setup"
@@ -50,7 +51,7 @@ RUN wget -O pspdev-ubuntu-x86_64.tar.gz "https://github.com/pspdev/pspdev/releas
 
 # Set up environment variables
 ENV PSPDEV="/home/pspdev/pspdev"
-ENV PATH="$PATH:$PSPDEV/bin"
+ENV PATH="/home/pspdev/.local/bin:$PSPDEV/bin:$PATH"
 
 # Install uv for Python package management
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
