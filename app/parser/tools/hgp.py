@@ -3,11 +3,16 @@
 
 import os
 import json
-import png
-import common
 import numpy as np
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional
+
+try:
+    from . import common
+    from .pillow_png import read_png, write_indexed_png, write_rgb_png, write_rgba_png
+except ImportError:
+    import common
+    from pillow_png import read_png, write_indexed_png, write_rgb_png, write_rgba_png
 
 # region: --- 1. 核心数据模型 ---
 # 这些类精确地映射了HGPT文件格式的各个逻辑部分，使得代码结构与文件结构保持一致。
@@ -645,22 +650,22 @@ def export_hgpt(file_path: str):
         
     with open(output_path_picture, 'wb') as f:
         if hgpt_image.palette:
-            writer = png.Writer(
-                hgpt_image.display_info.width, 
-                hgpt_image.display_info.height, 
-                palette=hgpt_image.palette.colors
+            f.write(
+                write_indexed_png(
+                    hgpt_image.display_info.width,
+                    hgpt_image.display_info.height,
+                    hgpt_image.content,
+                    hgpt_image.palette.colors,
+                )
             )
-            # content is already a list of palette indices
-            writer.write_array(f, hgpt_image.content)
         else: # RGBA
-            writer = png.Writer(
-                hgpt_image.display_info.width, 
-                hgpt_image.display_info.height, 
-                alpha=True
+            f.write(
+                write_rgba_png(
+                    hgpt_image.display_info.width,
+                    hgpt_image.display_info.height,
+                    hgpt_image.content,
+                )
             )
-            # Flatten the list of (r,g,b,a) tuples
-            flattened_data = [channel for pixel in hgpt_image.content for channel in pixel]
-            writer.write_array(f, flattened_data)
 
     print(f'  -> Created {output_path_picture}')
     print(f'  -> Created {output_path_metadata}')
@@ -679,9 +684,7 @@ def export_hgpt(file_path: str):
                         canvas[y * width + x] = draw_color
         
         with open(output_path_helper, 'wb') as f:
-            pw = png.Writer(width, height)
-            flattened_helper_data = [channel for pixel in canvas for channel in pixel]
-            pw.write_array(f, flattened_helper_data)
+            f.write(write_rgb_png(width, height, canvas))
         print(f'  -> Created {output_path_helper}')
 
 
@@ -705,8 +708,8 @@ def import_hgpt(base_path: str):
     header.unknown_two = metadata_dict.get('unknown_two', 0)
     header.unknown_three = metadata_dict.get('unknown_three', 0x0013)
     
-    pr = png.Reader(filename=input_path_picture)
-    width, height, rows, info = pr.read()
+    decoded = read_png(input_path_picture)
+    width, height = decoded.width, decoded.height
     
     display_info = DisplayInfo(width=width, height=height)
     
@@ -721,9 +724,9 @@ def import_hgpt(base_path: str):
     palette = None
     content = []
     
-    if 'palette' in info:
-        colors = [(c[0], c[1], c[2], c[3] if len(c) > 3 else 255) for c in info['palette']]
-        
+    if decoded.palette is not None:
+        colors = list(decoded.palette)
+
         # Extend palette to fit standard sizes
         if 0 < len(colors) < 16:
             colors.extend([(0,0,0,255)] * (16 - len(colors)))
@@ -731,15 +734,9 @@ def import_hgpt(base_path: str):
             colors.extend([(0,0,0,255)] * (256 - len(colors)))
         
         palette = Palette(colors)
-        content = [pixel for row in rows for pixel in row]
+        content = list(decoded.pixels)
     else: # RGBA
-        pixel_depth = 4 if info['alpha'] else 3
-        rows_list = list(rows)
-        for row in rows_list:
-            for i in range(0, len(row), pixel_depth):
-                r, g, b = row[i], row[i+1], row[i+2]
-                a = row[i+3] if info['alpha'] else 255
-                content.append((r,g,b,a))
+        content = decoded.rgba_pixels()
     
     hgpt_image = HgptImage(header, display_info, content, palette, division_info)
     HgptWriter(hgpt_image).write(base_path)
@@ -784,7 +781,7 @@ if __name__ == '__main__':
             raise ValueError(f'Unknown action: {action}')
             
     except Exception as e:
-        print(f'\n--- ERROR ---')
+        print('\n--- ERROR ---')
         print(f'{type(e).__name__}: {e}')
         traceback.print_exc()
         sys.exit(-1)

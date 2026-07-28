@@ -27,8 +27,9 @@ Environment:
 - Corrected and streaming measurements: `feat/stream` working tree containing
   the correctness fixes and streaming implementation described below.
 - Platform: macOS 26.2, arm64.
-- Python: CPython 3.13.5.
-- Date: 2026-07-27.
+- Initial corrected measurements: CPython 3.13.5 on 2026-07-27.
+- Pillow/parallel measurements: CPython 3.9.6 on 2026-07-28. The final
+  database and streaming runs below use this same interpreter.
 
 This is one wall-clock run with local filesystem caches in their natural state.
 Absolute timings will vary by machine; comparisons should use the same machine,
@@ -212,18 +213,107 @@ generic translations use deterministic import order, and images use the more
 specific deeper path with a stable path tie-break. All selected translations
 and images were matched, with no CEV original mismatches.
 
+## Pillow and Parallel PNG Optimization
+
+Profiling the 12.248-second streaming path showed that most of the HGAR stage
+was image work rather than HGAR container parsing. Each of the 371 unique
+translated images started `pngquant` with two temporary files, then decoded its
+indexed output through PyPNG. Four-bit palette rows caused approximately 15
+million Python-level unpacking operations.
+
+The replacement path:
+
+- sends PNG bytes to `pngquant` through stdin and receives stdout;
+- keeps `--speed 1` and the original 16/256-color limit;
+- decodes palette indexes through Pillow's native PNG implementation;
+- reconstructs RGBA palette alpha from PNG `tRNS` data without converting the
+  indexed image to RGBA;
+- rebuilds unique HGPT images with four workers while retaining an eight-archive
+  bounded window and deterministic archive write order; and
+- removes the vendored PyPNG module and its optional `pngfilters` accelerator.
+
+The compatibility test covered all 371 selected translated images: 267 target
+16-color HGPTs and 104 target 256-color HGPTs. The inputs contained 260 RGB and
+111 RGBA PNGs. Pillow reported 103 per-entry `tRNS` byte arrays, five single
+transparent indexes, and 263 images without transparency metadata.
+
+| Isolated image operation | Time (seconds) |
+| --- | ---: |
+| Existing temporary-file `pngquant` | 4.376 |
+| Serial stdin/stdout `pngquant` | 4.189 |
+| Four-worker stdin/stdout `pngquant` | 1.533 |
+| PyPNG indexed decode | 3.703 |
+| Pillow indexed decode | 0.055 |
+
+Temporary-file and stdin/stdout `pngquant` output was byte-identical for all
+371 images. Serial and four-worker output was also byte-identical, and Pillow
+returned the same dimensions, palette order, per-entry alpha, and pixel indexes
+as PyPNG for every image.
+
+Both complete pipelines were then rerun under CPython 3.9.6. The database run:
+
+```sh
+uv run python scripts/benchmark_resource_pipeline.py \
+  --mode database \
+  --work-dir /private/tmp/nge2-database-pillow.fZkcxS \
+  --json /private/tmp/nge2-database-pillow.fZkcxS/database-pillow.json
+```
+
+| Database stage | Time (seconds) |
+| --- | ---: |
+| Initialize database | 0.211 |
+| Import HGAR | 14.443 |
+| Import TEXT | 0.406 |
+| Import BIND | 10.016 |
+| Import translated images | 6.819 |
+| Import translations | 2.311 |
+| Export TEXT | 0.410 |
+| Export BIND | 2.447 |
+| Export HGAR | 12.497 |
+| Generate and inject staff roll | 0.319 |
+| **Total wall clock** | **49.918** |
+
+The database occupied 435,216,384 bytes (approximately 415 MiB). The matching
+streaming run used four image workers:
+
+```sh
+uv run python scripts/benchmark_resource_pipeline.py \
+  --mode streaming \
+  --work-dir /private/tmp/nge2-streaming-pillow-final.5ORq29 \
+  --json \
+    /private/tmp/nge2-streaming-pillow-final.5ORq29/streaming-pillow-final.json
+```
+
+| Streaming stage | Time (seconds) |
+| --- | ---: |
+| Load translation and image catalogs | 0.172 |
+| Transform standalone TEXT | 0.028 |
+| Transform BIND | 0.574 |
+| Transform HGAR/EVS/HGPT | 6.542 |
+| Generate and inject staff roll | 0.283 |
+| In-process work | 7.599 |
+| Process startup and report writing | 0.242 |
+| **Total wall clock** | **7.841** |
+
+Under the same interpreter and inputs, streaming is **6.366 times faster** than
+the database path, an **84.3% wall-clock reduction**, and avoids the 415 MiB
+SQLite intermediate. Compared with the earlier 12.248-second streaming run,
+the final path is another 1.562 times faster, although that earlier run used a
+different CPython version and is retained as a directional historical result.
+
 ## Output Comparison
 
-The corrected database and streaming trees were compared using
+The final same-interpreter database and streaming trees were compared using
 `scripts/compare_resource_outputs.py`. It checks ordinary files byte-for-byte,
 then compares HGAR metadata and order, decompressed entry data, raw custom
 encoded TEXT/EVS/BIND structures, and HGPT pixels and metadata.
 
 ```sh
 uv run python scripts/compare_resource_outputs.py \
-  /private/tmp/nge2-database-final.Q7xDXn/old_output/ULJS00064/PSP_GAME/USRDIR \
-  /private/tmp/nge2-streaming-final.Y9HfFj/new_output/ULJS00064/PSP_GAME/USRDIR \
-  --json /private/tmp/nge2-streaming-final.Y9HfFj/compare-final.json
+  /private/tmp/nge2-database-pillow.fZkcxS/old_output/ULJS00064/PSP_GAME/USRDIR \
+  /private/tmp/nge2-streaming-pillow-final.5ORq29/new_output/ULJS00064/PSP_GAME/USRDIR \
+  --json \
+    /private/tmp/nge2-streaming-pillow-final.5ORq29/compare-database-pillow.json
 ```
 
 | Result | Files |
@@ -256,9 +346,9 @@ The direct command defaults to a separate `build/direct` tree and writes a JSON
 match/timing report. The database workflow remains available as a development
 and parity reference. SQLite is useful for interactive querying and persistent
 editing, but for a one-shot deterministic build it is a net cost: the corrected
-run spends about 34.0 seconds importing/persisting data and another 24.0 seconds
-reconstructing it, while the streaming path transforms the same resources in
-12.2 seconds.
+same-interpreter run spends about 34.2 seconds importing/persisting data and
+15.7 seconds reconstructing it, while the streaming path transforms the same
+resources in 7.8 seconds.
 
 ## Remaining Verification
 
@@ -275,10 +365,11 @@ The resource-stage acceptance requirements have passed:
 - Duplicate HGAR entries are preserved in order.
 - The database pipeline remains available as a parity reference.
 
-The focused HGPT and streaming regression suite passes all seven tests. Targeted
-Ruff checks cover the pipeline, benchmark/comparison tools, translation DAO,
-and focused tests. The repository-wide quality gate still includes unrelated
-legacy failures, so those results are not attributed to this performance work.
+The focused PNG, HGPT, and streaming regression suite passes all 12 tests.
+Targeted Ruff checks cover the Pillow layer, pipeline, staff-roll compatibility
+fix, benchmark/comparison tools, translation DAO, and focused tests. The
+repository-wide quality gate still includes unrelated legacy failures, so those
+results are not attributed to this performance work.
 
 This benchmark intentionally excludes ISO extraction, plugin compilation,
 EBOOT decryption, ISO repacking, xdelta generation, and PPSSPP/hardware runtime

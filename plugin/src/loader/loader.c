@@ -14,7 +14,6 @@
 #include <pspctrl.h>
 
 #include "runtime_args.h"
-#include "unifont.h"
 #include "ui_atlas.h"
 #include "image_display.h"
 

@@ -16,8 +16,6 @@ I've deprecated all the patches in the ./patches/ folder and instead replaced th
 ./translation/ folder that is a mix of human translation and machine translation. 
 More on this later.
 
-`./apply.sh` is a script that applies the WIP in translations to unpacked iso contents in the ./unpacked/ folder.
-
 ## Image Translation Status
 - Images with text:
 	- [x] Pick all the images with text that need to be translated

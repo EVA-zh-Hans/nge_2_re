@@ -65,11 +65,13 @@ make check-generated
 └── src
     ├── bin # Binaries converted to C arrays
     ├── loader # EBOOT Loader
+    ├── runtime # Runtime patch registration and patch implementations
     └── utils # Log Util
 ```
 
-+ `patcher.c` Patches two condition checks and a `jal` call
-+ `transform.c` Contains the patched function
++ `src/runtime/patches/` contains the active runtime patch implementations.
++ `src/loader/ui_draw.c` contains the loader UI renderer.
++ `transform.c` contains the translated text conversion functions.
 
 ## Basic Idea
 

@@ -7,11 +7,13 @@ import os
 import shutil
 import tempfile
 import time
+from collections import deque
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from app.parser.tools.bind import BindArchive
-from app.parser.tools.hgar import HGArchive
+from app.parser.tools.hgar import HGArchive, HGArchiveFile
 from app.parser.tools.text import TextArchive
 
 from .catalog import ImageCatalog, TranslationCatalog
@@ -49,6 +51,16 @@ class BuildStats:
     timings: dict[str, float] = field(default_factory=dict)
 
 
+@dataclass
+class PendingArchive:
+    archive: HGArchive
+    source: Path
+    target: Path
+    image_replacements: list[tuple[HGArchiveFile, Future[bytes]]]
+    changed: bool
+    duplicate_count: int
+
+
 class StreamBuilder:
     def __init__(
         self,
@@ -59,6 +71,7 @@ class StreamBuilder:
         staff_output: Path,
         staff_header: Path,
         include_staff: bool,
+        image_workers: int = 4,
     ) -> None:
         self.source = source.resolve()
         self.output = output.resolve()
@@ -67,10 +80,14 @@ class StreamBuilder:
         self.staff_output = staff_output.resolve()
         self.staff_header = staff_header.resolve()
         self.include_staff = include_staff
+        if image_workers < 1:
+            raise ValueError("image_workers must be at least 1")
+        self.image_workers = image_workers
+        self.archive_window = image_workers * 2
         self.stats = BuildStats()
         self.translations: TranslationCatalog | None = None
         self.image_catalog: ImageCatalog | None = None
-        self._rebuilt_hgpt: dict[str, bytes] = {}
+        self._rebuilt_hgpt: dict[str, Future[bytes]] = {}
 
     def build(self) -> dict:
         self._validate_inputs()
@@ -170,17 +187,36 @@ class StreamBuilder:
         for directory in HGAR_DIRS:
             paths.extend((self.source / directory).rglob("*.har"))
         paths.sort(key=lambda path: path.relative_to(self.source).as_posix())
-        for index, source in enumerate(paths, 1):
-            self._transform_hgar(source, self.output / source.relative_to(self.source))
-            if index % 100 == 0 or index == len(paths):
-                print(f"processed HGAR {index}/{len(paths)}", flush=True)
+        pending: deque[PendingArchive] = deque()
+        completed = 0
+        with ThreadPoolExecutor(
+            max_workers=self.image_workers,
+            thread_name_prefix="hgpt",
+        ) as executor:
+            for source in paths:
+                target = self.output / source.relative_to(self.source)
+                pending.append(self._prepare_hgar(source, target, executor))
+                if len(pending) >= self.archive_window:
+                    self._finish_hgar(pending.popleft())
+                    completed += 1
+                    self._report_hgar_progress(completed, len(paths))
+            while pending:
+                self._finish_hgar(pending.popleft())
+                completed += 1
+                self._report_hgar_progress(completed, len(paths))
 
-    def _transform_hgar(self, source: Path, target: Path) -> None:
+    def _prepare_hgar(
+        self,
+        source: Path,
+        target: Path,
+        executor: ThreadPoolExecutor,
+    ) -> PendingArchive:
         assert self.translations is not None
         assert self.image_catalog is not None
         archive = HGArchive(None, [])
         archive.open(str(source))
         changed = False
+        image_replacements = []
         seen_keys = set()
         duplicate_count = 0
 
@@ -213,13 +249,15 @@ class StreamBuilder:
                 content_hash = hashlib.md5(content).hexdigest()
                 image_override = self.image_catalog.find(content_hash)
                 if image_override is not None:
-                    replacement = self._rebuilt_hgpt.get(content_hash)
-                    if replacement is None:
-                        replacement = rebuild_hgpt(content, image_override)
-                        self._rebuilt_hgpt[content_hash] = replacement
+                    future = self._rebuilt_hgpt.get(content_hash)
+                    if future is None:
+                        future = executor.submit(rebuild_hgpt, content, image_override)
+                        self._rebuilt_hgpt[content_hash] = future
                     else:
                         self.stats.hgpt_cache_hits += 1
+                    image_replacements.append((entry, future))
                     self.stats.hgpt_files_changed += 1
+                    changed = True
 
             if replacement is not None:
                 entry.content = (
@@ -230,16 +268,40 @@ class StreamBuilder:
                 entry.size = len(entry.content)
                 changed = True
 
-        if changed:
-            _atomic_save_archive(archive, target)
+        return PendingArchive(
+            archive=archive,
+            source=source,
+            target=target,
+            image_replacements=image_replacements,
+            changed=changed,
+            duplicate_count=duplicate_count,
+        )
+
+    def _finish_hgar(self, pending: PendingArchive) -> None:
+        for entry, future in pending.image_replacements:
+            replacement = future.result()
+            entry.content = (
+                compress_hgar_entry(replacement)
+                if entry.is_compressed
+                else replacement
+            )
+            entry.size = len(entry.content)
+
+        if pending.changed:
+            _atomic_save_archive(pending.archive, pending.target)
             self.stats.changed_archives += 1
             self.stats.verified_archives += 1
         else:
-            _atomic_copy(source, target)
+            _atomic_copy(pending.source, pending.target)
             self.stats.copied_archives += 1
         self.stats.archives += 1
-        self.stats.archive_entries += len(archive.files)
-        self.stats.duplicate_archive_entries_preserved += duplicate_count
+        self.stats.archive_entries += len(pending.archive.files)
+        self.stats.duplicate_archive_entries_preserved += pending.duplicate_count
+
+    @staticmethod
+    def _report_hgar_progress(completed: int, total: int) -> None:
+        if completed % 100 == 0 or completed == total:
+            print(f"processed HGAR {completed}/{total}", flush=True)
 
     def _generate_staff_roll(self) -> None:
         from scripts.staff.generate_staff_roll import write_outputs
@@ -260,6 +322,7 @@ class StreamBuilder:
         return {
             "source": str(self.source),
             "output": str(self.output),
+            "settings": {"image_workers": self.image_workers},
             "stats": asdict(self.stats),
             "catalogs": {
                 "generic_translations": len(self.translations.generic),
@@ -384,6 +447,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=ROOT / "plugin/src/runtime/patches/generated_staff_roll.h",
     )
+    parser.add_argument("--image-workers", type=int, default=min(4, os.cpu_count() or 1))
     parser.add_argument("--skip-staff", action="store_true")
     return parser.parse_args()
 
@@ -398,6 +462,7 @@ def main() -> None:
         staff_output=args.staff_output,
         staff_header=args.staff_header,
         include_staff=not args.skip_staff,
+        image_workers=args.image_workers,
     )
     report = builder.build()
     args.report.parent.mkdir(parents=True, exist_ok=True)

@@ -5,7 +5,6 @@ Persist HGPT Image
 
 import hashlib
 import io
-import os
 import shutil
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -13,7 +12,15 @@ import logging
 from tqdm import tqdm
 
 from ..db import get_db
-from app.parser.tools import hgp, png
+from app.parser.tools import hgp
+from app.parser.tools.pillow_png import (
+    convert_indexed_to_rgba_png,
+    quantize_png,
+    quantize_png_fallback,
+    read_png,
+    write_indexed_png,
+    write_rgba_png,
+)
 
 from ..entity.hgpt import Hgpt
 
@@ -292,43 +299,18 @@ class HgptDao:
         Returns:
             bytes: PNG 图像数据
         """
-        output = io.BytesIO()
-        
         if hgpt_image.palette:
-            # 调色板模式
-            # PNG Writer 需要 (r,g,b,a) 元组列表
-            palette_colors = hgpt_image.palette.colors
-            
-            w = png.Writer(
-                width=hgpt_image.display_info.width,
-                height=hgpt_image.display_info.height,
-                palette=palette_colors,
-                bitdepth=8,
-                compression=1,
-                filter_type=0
+            return write_indexed_png(
+                hgpt_image.display_info.width,
+                hgpt_image.display_info.height,
+                hgpt_image.content,
+                hgpt_image.palette.colors,
             )
-            rows = [
-                hgpt_image.content[i:i + hgpt_image.display_info.width]
-                for i in range(0, len(hgpt_image.content), hgpt_image.display_info.width)
-            ]
-        else:
-            # RGBA 模式
-            w = png.Writer(
-                width=hgpt_image.display_info.width,
-                height=hgpt_image.display_info.height,
-                greyscale=False,
-                alpha=True,
-                compression=1,
-                filter_type=0
-            )
-            rows = []
-            width = hgpt_image.display_info.width
-            for offset in range(0, len(hgpt_image.content), width):
-                pixels = hgpt_image.content[offset:offset + width]
-                rows.append([channel for pixel in pixels for channel in pixel])
-        
-        w.write(output, rows)
-        return output.getvalue()
+        return write_rgba_png(
+            hgpt_image.display_info.width,
+            hgpt_image.display_info.height,
+            hgpt_image.content,
+        )
     
     @staticmethod
     def _get_pp_format(hgpt_image: hgp.HgptImage) -> int:
@@ -364,8 +346,7 @@ class HgptDao:
         """
         # 1. 读取 PNG 图像（优先使用翻译版本）
         png_data = hgpt.png_translated if hgpt.png_translated else hgpt.png_image
-        pr = png.Reader(bytes=png_data)
-        width, height, rows, info = pr.read()
+        decoded = read_png(png_data)
         
         # 2. 重建 HgptHeader
         header = hgp.HgptHeader()
@@ -388,9 +369,9 @@ class HgptDao:
         palette = None
         content = []
         
-        if 'palette' in info:
+        if decoded.palette is not None:
             # 调色板模式
-            colors = [(c[0], c[1], c[2], c[3] if len(c) > 3 else 255) for c in info['palette']]
+            colors = list(decoded.palette)
             
             # 扩展调色板到标准大小
             if 0 < len(colors) < 16:
@@ -399,16 +380,9 @@ class HgptDao:
                 colors.extend([(0, 0, 0, 255)] * (256 - len(colors)))
             
             palette = hgp.Palette(colors)
-            content = [pixel for row in rows for pixel in row]
+            content = list(decoded.pixels)
         else:
-            # RGBA 模式
-            pixel_depth = 4 if info['alpha'] else 3
-            rows_list = list(rows)
-            for row in rows_list:
-                for i in range(0, len(row), pixel_depth):
-                    r, g, b = row[i], row[i+1], row[i+2]
-                    a = row[i+3] if info['alpha'] else 255
-                    content.append((r, g, b, a))
+            content = decoded.rgba_pixels()
         
         # 6. 构建 HgptImage 对象
         hgpt_image = hgp.HgptImage(
@@ -440,8 +414,8 @@ class HgptDao:
                 raise ValueError(f"HGPT not found: {hgpt_key}")
             
             # 验证 PNG 尺寸（必须与原始图像一致）
-            pr = png.Reader(bytes=translated_png_data)
-            width, height, _, _ = pr.read()
+            decoded = read_png(translated_png_data)
+            width, height = decoded.width, decoded.height
             if width != hgpt.width or height != hgpt.height:
                 raise ValueError(
                     f"Size mismatch: expected {hgpt.width}x{hgpt.height}, "
@@ -467,7 +441,6 @@ class HgptDao:
             Dict[har_name, List[(filename, hgpt_key)]]: 导出的文件映射
         """
         from ..entity.hgar import Hgar
-        from ..entity.hgar_file import HgarFile
         
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
@@ -588,8 +561,8 @@ class HgptDao:
                 
                 try:
                     # 验证尺寸并转换格式
-                    pr = png.Reader(bytes=translated_png_raw)
-                    width, height, rows, info = pr.read()
+                    decoded = read_png(translated_png_raw)
+                    width, height = decoded.width, decoded.height
                     
                     if width != hgpt.width or height != hgpt.height:
                         logger.warning("  [Import] Skip (size mismatch): %s (expected %dx%d, got %dx%d)", png_file.name, hgpt.width, hgpt.height, width, height)
@@ -597,7 +570,7 @@ class HgptDao:
                     
                     # 根据原始格式转换PNG
                     needs_palette = hgpt.palette_size is not None  # 原始是调色板格式
-                    is_currently_palette = 'palette' in info  # 当前PNG是调色板格式
+                    is_currently_palette = decoded.is_indexed
                     
                     if needs_palette and not is_currently_palette:
                         # 需要调色板但当前是RGBA，转换为调色板
@@ -641,133 +614,14 @@ class HgptDao:
         Returns:
             bytes: 调色板格式的PNG数据
         """
-        import subprocess
-        import tempfile
-        
-        # 检查 pngquant 是否可用
-        pngquant_available = False
-        try:
-            result = subprocess.run(['pngquant', '--version'], capture_output=True, check=True)
-            pngquant_available = True
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            pass
-        
-        if not pngquant_available:
-            print(f"  [Info] pngquant not installed, using fallback method")
-            print(f"  [Info] For better quality, install pngquant: apt install pngquant")
-            return HgptDao._convert_rgba_to_palette_fallback(png_data, target_palette_size)
-        
-        # 使用临时文件
-        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_input:
-            tmp_input.write(png_data)
-            tmp_input_path = tmp_input.name
-        
-        tmp_output_path = tmp_input_path.replace('.png', '-fs8.png')
-        
-        try:
-            # 运行 pngquant
-            # --force: 覆盖输出文件
-            # --speed 1: 最高质量
-            # --quality 80-85: 平衡质量和调色板限制
-            result = subprocess.run(
-                [
-                    'pngquant',
-                    '--force',
-                    '--speed', '1',
-                    str(target_palette_size),
-                    tmp_input_path,
-                    '--output', tmp_output_path,
-                    '-v'
-                ],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            
-            # 读取输出文件
-            if os.path.exists(tmp_output_path):
-                with open(tmp_output_path, 'rb') as f:
-                    quantized_data = f.read()
-            else:
-                # 如果失败，使用备用方法
-                print(f"  [Warning] pngquant failed, using fallback method")
-                print(f"Output: ", result)
-                return HgptDao._convert_rgba_to_palette_fallback(png_data, target_palette_size)
-            
-            return quantized_data
-            
-        except subprocess.TimeoutExpired:
-            print(f"  [Warning] pngquant timeout, using fallback method")
-            return HgptDao._convert_rgba_to_palette_fallback(png_data, target_palette_size)
-        except Exception as e:
-            print(f"  [Warning] pngquant error: {e}, using fallback method")
-            return HgptDao._convert_rgba_to_palette_fallback(png_data, target_palette_size)
-        finally:
-            # 清理临时文件
-            if os.path.exists(tmp_input_path):
-                os.unlink(tmp_input_path)
-            if os.path.exists(tmp_output_path):
-                os.unlink(tmp_output_path)
+        return quantize_png(png_data, target_palette_size)
     
     @staticmethod
     def _convert_rgba_to_palette_fallback(png_data: bytes, target_palette_size: int) -> bytes:
         """
         备用的简单颜色量化（当 Pillow 不可用时）
         """
-        # 读取RGBA图像
-        pr = png.Reader(bytes=png_data)
-        width, height, rows, info = pr.read()
-        
-        # 收集所有像素颜色
-        rows_list = list(rows)
-        pixel_depth = 4 if info.get('alpha') else 3
-        
-        all_pixels = []
-        for row in rows_list:
-            for i in range(0, len(row), pixel_depth):
-                r, g, b = row[i], row[i+1], row[i+2]
-                a = row[i+3] if pixel_depth == 4 else 255
-                all_pixels.append((r, g, b, a))
-        
-        # 简单去重构建调色板
-        unique_colors = []
-        color_to_index = {}
-        for pixel in all_pixels:
-            if pixel not in color_to_index:
-                if len(unique_colors) >= target_palette_size:
-                    continue
-                color_to_index[pixel] = len(unique_colors)
-                unique_colors.append(pixel)
-        
-        # 如果颜色数超过目标大小，截断
-        if len(unique_colors) > target_palette_size:
-            print(f"  [Warning] Too many colors ({len(unique_colors)}), truncating to {target_palette_size}")
-            unique_colors = unique_colors[:target_palette_size]
-            color_to_index = {color: idx for idx, color in enumerate(unique_colors)}
-        
-        # 扩展调色板到标准大小
-        while len(unique_colors) < target_palette_size:
-            unique_colors.append((0, 0, 0, 255))
-        
-        # 将像素转换为索引
-        indexed_pixels = []
-        for pixel in all_pixels:
-            indexed_pixels.append(color_to_index.get(pixel, 0))
-        
-        # 生成调色板PNG
-        output = io.BytesIO()
-        w = png.Writer(
-            width=width,
-            height=height,
-            palette=unique_colors,
-            bitdepth=8
-        )
-        indexed_rows = [
-            indexed_pixels[i:i + width]
-            for i in range(0, len(indexed_pixels), width)
-        ]
-        w.write(output, indexed_rows)
-        return output.getvalue()
+        return quantize_png_fallback(png_data, target_palette_size)
     
     @staticmethod
     def _convert_palette_to_rgba(png_data: bytes) -> bytes:
@@ -780,33 +634,4 @@ class HgptDao:
         Returns:
             bytes: RGBA格式的PNG数据
         """
-        # 读取调色板图像
-        pr = png.Reader(bytes=png_data)
-        width, height, rows, info = pr.read()
-        
-        if 'palette' not in info:
-            # 已经是RGBA，直接返回
-            return png_data
-        
-        palette = info['palette']
-        rows_list = list(rows)
-        
-        # 转换为RGBA
-        rgba_rows = []
-        for row in rows_list:
-            rgba_row = []
-            for index in row:
-                color = palette[index]
-                rgba_row.extend([color[0], color[1], color[2], color[3] if len(color) > 3 else 255])
-            rgba_rows.append(rgba_row)
-        
-        # 生成RGBA PNG
-        output = io.BytesIO()
-        w = png.Writer(
-            width=width,
-            height=height,
-            greyscale=False,
-            alpha=True
-        )
-        w.write(output, rgba_rows)
-        return output.getvalue()
+        return convert_indexed_to_rgba_png(png_data)
