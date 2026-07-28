@@ -183,49 +183,6 @@ def combine_evs(dest_folder):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
-def update_string(key: str, content: str, auth, stage=2):
-    # sleep for 1 second to avoid rate limit
-    import time
-
-    time.sleep(0.5)
-    items = search_by_key(key, auth)
-    for item in items:
-        if item["stage"] == stage:
-            print(f"Already in stage {stage}")
-            continue
-        id = item["id"]
-        if content != "":
-            add_comment(id, content, auth)
-        print(update_status(id, stage, auth))
-
-
-# 查找到字符串ID
-def search_by_key(key, auth):
-    url = f"https://paratranz.cn/api/projects/{project_id}/strings?text={key}"
-    headers = {"Authorization": auth}
-    response = requests.get(url, headers=headers).json()
-    items = [item for item in response["results"]]
-    return items
-
-
-# 添加评论
-def add_comment(string_id, content: str, auth):
-    url = "https://paratranz.cn/api/comments"
-    headers = {"Authorization": auth}
-    data = {"type": "text", "tid": string_id, "content": content}
-    response = requests.post(url, headers=headers, json=data)
-    return response.json()
-
-
-# 更新有疑问状态
-def update_status(string_id, stage, auth):
-    url = f"https://paratranz.cn/api/projects/{project_id}/strings/{string_id}"
-    headers = {"Authorization": auth}
-    data = {"stage": stage}
-    response = requests.put(url, headers=headers, json=data)
-    return response.json()
-
-
 def download_file(url, dest_folder, auth: str):
     if not os.path.exists(dest_folder):
         os.makedirs(dest_folder)
