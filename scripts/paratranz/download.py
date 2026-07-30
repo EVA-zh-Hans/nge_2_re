@@ -12,14 +12,14 @@ import zipfile
 import os
 import argparse
 import json
-import hashlib
 import time
+from typing import Optional
 from .preprocess import normalize_data, hash_keys_in_data
 
 project_id = 10882  # 替换为你的项目ID
 
 
-def get_default_headers(auth_key: str | None = None) -> dict:
+def get_default_headers(auth_key: Optional[str] = None) -> dict:
     """Get default headers for Paratranz API requests"""
     headers = {}
     if auth_key:
@@ -89,7 +89,7 @@ def wait_for_rebuild(auth_key: str, max_wait_time: int = 600) -> bool:
 def download_function(
     auth_key: str,
     dest_folder: str = "temp/downloads",
-    project_id_override: int | None = None,
+    project_id_override: Optional[int] = None,
 ):
     if project_id_override is not None:
         global project_id
@@ -126,6 +126,7 @@ def merge_function(dest_folder: str = "temp/downloads"):
 def process_utf8_json(dest_folder):
     free_path = os.path.join(dest_folder, "utf8", "free")
     game_path = os.path.join(dest_folder, "utf8", "game")
+    cev_path = os.path.join(dest_folder, "utf8", "EVS", "cev")
     if os.path.exists(free_path):
         print("Processing JSON files in utf8/free and utf8/game folders...")
         for file in os.listdir(free_path):
@@ -151,6 +152,20 @@ def process_utf8_json(dest_folder):
                         json.dump(data, f, ensure_ascii=False, indent=4)
                     print(f"  Processed: {file_path}")
 
+    if os.path.exists(cev_path):
+        print("Processing split CEV JSON files in utf8/EVS/cev...")
+        for root, _, files in os.walk(cev_path):
+            for file in files:
+                if not file.endswith(".json"):
+                    continue
+                file_path = os.path.join(root, file)
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                data = normalize_data(data)
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False, indent=4)
+                print(f"  Processed: {file_path}")
+
 
 def combine_eboot(dest_folder):
     # Combine all the EBOOT Translations.
@@ -172,7 +187,12 @@ def combine_evs(dest_folder):
     evs_path = os.path.join(dest_folder, "raw", "EVS")
     data = []
     for root, dir, files in os.walk(evs_path):
+        dir[:] = [name for name in dir if name != "cev"]
         for file in files:
+            if not file.endswith(".json"):
+                continue
+            if file.startswith("cev"):
+                continue
             file_path = os.path.join(root, file)
             with open(file_path, "r", encoding="utf-8") as f:
                 data.extend(json.load(f))
