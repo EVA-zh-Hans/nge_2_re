@@ -3,17 +3,31 @@ title: '补丁下载'
 layout: ../layouts/MarkdownPostLayout.astro
 ---
 
-补丁在 [GitHub Release](https://github.com/xeonliu/nge_2_re/releases) 发布
+补丁在 [GitHub Release](https://github.com/EVA-zh-Hans/nge_2_re/releases) 发布
 
 补丁每月发布更新
 
-- 当前版本：v2.0.0-beta.1
-- 构建日期：2026年6月27日
+- 当前版本：v2.1.1-beta.1
+- 构建日期：2026年7月30日
  
 | 版本号    | 原始镜像CRC32 | 补丁后镜像CRC32 |
 |-----------|---------------|-----------------|
-| ULJS00064 | 1C8AF7DD      | D9429866        |
-| ULJS00061 | FA548951      | 84A1176E        |
+| ULJS00064 | 1C8AF7DD      | 5D295CCD        |
+| ULJS00061 | FA548951      | 00C6AB96        |
+
+<details>
+<summary>历史版本</summary>
+
+| 版本号        | 构建日期       | ULJS00061补丁后CRC32 | ULJS00064补丁后CRC32 |
+|---------------|----------------|----------------------|----------------------|
+| v2.1.0-beta.1 | 2026年7月28日  | 6E1C7B55             | D1BF2278             |
+| v2.0.1-beta.2 | 2026年7月27日  | 3CE29C10             | 5F237E43             |
+| v2.0.1-beta.1 | 2026年7月26日  | 1FDE6661             | 6EEBDF8C             |
+| v2.0.0-beta.1 | 2026年6月26日  | 84A1176E             | D9429866             |
+| v1.1.0-beta.1 | 2026年5月27日  | F403DA62             | DEC3E04D             |
+| v1.0.0-beta.1 | 2026年4月26日  | F7AB08B5             | F948F654             |
+
+</details>
 
 ## 使用方法
 
@@ -42,6 +56,21 @@ iOS 设备推荐将 CPU 核心模式改为 “解释器” 以减少 JIT 带来�
 * 启用战斗调试菜单：在战斗开始前出现相关调试菜单，使用方向键上下切换，O键进入子菜单，X键返回。注意，部分功能可能不可用，部分子菜单可能无法退出。进入部分菜单可能导致游戏卡死。
 * 启用日常调试菜单：在日常环节中，△按键原有功能被替代为日常调试菜单。其中具有各种调试功能，如获得物品等。当游戏内部对话出现时，调试菜单将无法退出持续渲染在屏幕上方。
  
+
+## 汉化人员名单
+
+以下为参与汉化的人员名单（排名不分先后）
+
+* 统筹：main_void、hanDragon20
+* 翻译：pan1927412、hanDragon20、Frykte、Liana384、blabubble、Belfraw、Tianying.exe、カロモリモキナエ、Asuka、mel、Laolv000、zxlraw、yokuse
+* 校对：hanDragon20、Frykte、blabubble、Belfraw、カロモリモキナエ、Asuka、mel、Laolv000
+* 程序：main_void
+* 美工：main_void、Belfraw、Katsumi_Mole
+
+### 特别鸣谢
+
+rezual/nge_2_re、deeRez、EvaGeeks 论坛、PSPDEV 社区、Paratranz 翻译平台、EVA2 汉化计划全体成员、所有支持和帮助过我们的人
+ 
 ## 问答
 
 Q：原始游戏镜像哪里找？
@@ -60,7 +89,6 @@ A：游戏本身如此
 
 > 由于该版本仍处于测试阶段，游玩过程中可能出现包括但不限于卡死、闪退、翻译错误、剧情错乱等问题。
 
-1. 摩耶剧本无法正常进入
-2. “啊，是的”与“啊，好的”翻译并未区分
+1. “啊，是的”与“啊，好的”翻译并未区分
 
 如遇到相关问题，欢迎在GitHub Issue 或 Codeberg Issue 下评论，也可加入“EVA2汉化粉丝反馈群”，建议附上截图、存档、即时存档和触发条件说明，以便开发人员复现和调试。
