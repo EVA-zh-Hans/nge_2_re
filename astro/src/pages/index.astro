@@ -1,6 +1,12 @@
 ---
 import Layout from "../layouts/Layout.astro";
-const allPosts = await Astro.glob(["./posts/*.md", "./posts/*.mdx"]);
+const allPosts = (
+  await Astro.glob(["./posts/*.md", "./posts/*.mdx"])
+).sort(
+  (a, b) =>
+    new Date(b.frontmatter.pubDate || "2024-01-01") -
+    new Date(a.frontmatter.pubDate || "2024-01-01")
+);
 import icon from "./posts/assets/logo.png";
 ---
 
@@ -119,7 +125,7 @@ import icon from "./posts/assets/logo.png";
                   <small class="u-text--muted">
                     {post.frontmatter.description || "文档"}
                   </small>
-                  <span class="p-badge" style="margin-left: 8px;">
+                  <span class="article-date">
                     {post.frontmatter.pubDate || "2024-01-01"}
                   </span>
                 </p>
