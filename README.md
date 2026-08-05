@@ -232,6 +232,18 @@ docker run -it --rm -v $(pwd):/app -w /app pspdev-dev
 
 ---
 
+## 👥 贡献者名单
+
+| 职责 | 成员 |
+| --- | --- |
+| 统筹 | main_void、hanDragon20 |
+| 翻译 | pan1927412、hanDragon20、Frykte、Liana384、blabubble、Belfraw、Tianying.exe、カロモリモキナエ、Asuka、mel、Laolv000、zxlraw、yokuse |
+| 校对 | hanDragon20、Frykte、blabubble、Belfraw、カロモリモキナエ、Asuka、mel、Laolv000 |
+| 程序 | main_void |
+| 美工 | main_void、Belfraw、Katsumi_Mole |
+
+---
+
 ## 🌟 致谢
 
 感谢以下项目和组织的启发与支持：
