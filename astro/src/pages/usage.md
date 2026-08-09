@@ -12,7 +12,25 @@ description: "如何安装和使用汉化补丁"
 - 对应版本号的补丁文件（xdelta3 格式）
 - PPSSPP 模拟器，或已破解的 PSP 实机（推荐 ARK-4）
 
-## 二、在线打补丁
+## 二、镜像预处理
+
+如果镜像转储正确完成，CRC32 校验码应当如下表所示
+
+|发行版本|CRC32|
+|---|---|
+|ULJS00064|1C8AF7DD|
+|ULJS00061|FA548951|
+
+如果镜像转储存在问题，得到了如下的 CRC32 校验码
+
+|发行版本|CRC32|
+|---|---|
+|ULJS00064|937D6304|
+|ULJS00061|CD46A4EC|
+
+请于`psp.hordeofninjas.com`（[互联网档案馆存档](https://web.archive.org/web/20180818235157/http://psp.hordeofninjas.com:80/)）下载对应的镜像修复补丁，使用第三步所述方式将镜像修复到正确的版本。
+
+## 三、在线打补丁
 
 本补丁以 xdelta3 格式发布，打补丁需要原始游戏镜像。推荐在网页端使用 xdelta-wasm 在线应用补丁，所有操作均在本地浏览器完成，不消耗流量。
 
@@ -23,7 +41,7 @@ description: "如何安装和使用汉化补丁"
 
 ![xdelta-wasm 在线打补丁工具](/nge_2_re/usage/xdelta-wasm.jpg)
 
-## 三、PPSSPP 模拟器
+## 四、PPSSPP 模拟器
 
 1. 打开 PPSSPP，加载补丁后的镜像即可运行
 2. iOS 设备推荐将 CPU 核心模式改为“解释器”，以减少 JIT 带来的性能损失
