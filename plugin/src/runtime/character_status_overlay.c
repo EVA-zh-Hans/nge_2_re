@@ -19,6 +19,7 @@
 #define OVERLAY_VISIBLE_BIT 0x01u
 #define OVERLAY_PAGE_SHIFT 8u
 
+/* These are all game-side cross-references to sceDisplaySetFrameBuf. */
 #define DISPLAY_SET_FRAMEBUF_GAME_ADDR 0x089B2AB8u
 #define DISPLAY_SET_FRAMEBUF_CALL_INIT 0x0898D614u
 #define DISPLAY_SET_FRAMEBUF_CALL_ENABLE 0x0898DE00u
@@ -138,6 +139,8 @@ void CharacterStatusOverlay_Start(uint32_t game_base)
     if (g_overlay_thread < 0) {
         RuntimeLog_Printf("character status thread create failed: %d", g_overlay_thread);
         g_overlay_running = 0;
+        g_characters = 0;
+        g_game_base = 0;
         return;
     }
 
@@ -147,6 +150,8 @@ void CharacterStatusOverlay_Start(uint32_t game_base)
         sceKernelDeleteThread(g_overlay_thread);
         g_overlay_thread = -1;
         g_overlay_running = 0;
+        g_characters = 0;
+        g_game_base = 0;
         return;
     }
     CharacterStatusOverlay_SetDisplayHooks(game_base, 1);
