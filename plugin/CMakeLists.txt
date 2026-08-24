@@ -22,6 +22,9 @@ set(RUNTIME_SOURCES
     src/runtime/runtime_entry.c
     src/runtime/runtime_patch.c
     src/runtime/hook_write.c
+    src/runtime/character_status_overlay.c
+    src/runtime/character_status_overlay_core.c
+    src/runtime/character_status_renderer.c
     src/runtime/patches/text_encoding_patch.c
     src/runtime/patches/sentence_patch.c
     src/runtime/patches/external_translation_patch.c
@@ -35,6 +38,7 @@ set(RUNTIME_SOURCES
     src/runtime/patches/memtalk/memtalk_game_calls.c
     src/runtime/patches/memtalk/memtalk_templates.c
     src/transform.c
+    src/bin/atlas.c
     src/bin/gb2312.c
     src/bin/sjis.c
     src/bin/utf16.c
@@ -66,6 +70,11 @@ target_link_libraries(EBOOT PRIVATE
     pspdisplay
     pspctrl
     pspge
+)
+
+target_link_libraries(EVA2RT PRIVATE
+    pspdisplay
+    pspctrl
 )
 
 # Include directories  

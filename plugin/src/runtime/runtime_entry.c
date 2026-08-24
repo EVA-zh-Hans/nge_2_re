@@ -1,6 +1,7 @@
 #include <pspkernel.h>
 #include <pspmodulemgr.h>
 
+#include "character_status_overlay.h"
 #include "runtime_args.h"
 #include "runtime_patch.h"
 #include "runtime_log.h"
@@ -37,11 +38,15 @@ int module_start(SceSize args, void *argp)
 
     RuntimeLog_Printf("runtime game_base=%08x", (unsigned)info.segmentaddr[0]);
     RuntimePatch_InstallAll(info.segmentaddr[0], start_args.flags);
+    CharacterStatusOverlay_Start(info.segmentaddr[0]);
     RuntimeLog_Printf("runtime install all done");
     return 0;
 }
 
 int module_stop(SceSize args, void *argp)
 {
+    (void)args;
+    (void)argp;
+    CharacterStatusOverlay_Stop();
     return 0;
 }
