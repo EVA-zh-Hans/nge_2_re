@@ -34,7 +34,7 @@ help:
 	@echo "Available commands:"
 	@echo "  make init_db             - Initialize the database"
 	@echo "  make import_all          - Import all assets (hgar, text, bind)"
-	@echo "  make download_trans      - Download translations from ParaTranz"
+	@echo "  make download_trans      - Download translations, terminology, and run checks"
 	@echo "  make generate_memtalk_templates - Generate Runtime MemTalk C templates"
 	@echo "  make generate_staff_roll - Generate translated Staff Roll assets"
 	@echo "  make preview_staff_roll  - Generate and open the Staff Roll PNG preview"
@@ -86,6 +86,7 @@ download_trans:
 	@mkdir -p $(DOWNLOAD_DIR)
 	$(UV_RUN) -m scripts.paratranz.download --action download --dest_folder $(DOWNLOAD_DIR)
 	$(UV_RUN) -m scripts.paratranz.download --action merge --dest_folder $(DOWNLOAD_DIR)
+	$(MAKE) check_trans
 
 generate_memtalk_templates:
 	@echo "Generating MemTalk Runtime templates..."
@@ -93,11 +94,12 @@ generate_memtalk_templates:
 		--input '$(DOWNLOAD_DIR)/utf8/memtalk.json' \
 		--output 'plugin/src/runtime/patches/memtalk/memtalk_templates.c'
 
-# TODO: Add specific check targets if needed, or group them here
 check_trans:
 	@echo "Checking translations..."
-	$(UV_RUN) -m scripts.check '$(DOWNLOAD_DIR)/evs_trans.json' $(BUILD_DIR)/evs_report.json evs
-	# ... (Add other checks here if needed)
+	$(UV_RUN) -m scripts.check \
+		--downloads-dir '$(DOWNLOAD_DIR)' \
+		--terms-file '$(DOWNLOAD_DIR)/terms-10882.json' \
+		--report '$(BUILD_DIR)/translation_report.json'
 
 import_trans: generate_memtalk_templates
 	@echo "Importing translations..."

@@ -86,6 +86,56 @@ def wait_for_rebuild(auth_key: str, max_wait_time: int = 600) -> bool:
     return False
 
 
+def _extract_term_entries(payload):
+    """Accept the list and common envelope shapes returned by ParaTranz."""
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        for key in ("terms", "results", "data"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return value
+    return None
+
+
+def download_terms(
+    auth_key: str,
+    dest_folder: str = "temp/downloads",
+    project_id_override: Optional[int] = None,
+):
+    """Download and save the project's ParaTranz terminology table."""
+    current_project_id = project_id_override or project_id
+    url = f"https://paratranz.cn/api/projects/{current_project_id}/terms"
+    try:
+        response = requests.get(
+            url,
+            headers=get_default_headers(auth_key),
+            timeout=30,
+        )
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Failed to download ParaTranz terms: {exc}") from exc
+
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"Failed to download ParaTranz terms: HTTP {response.status_code}"
+        )
+
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise RuntimeError("ParaTranz terms response is not valid JSON") from exc
+
+    if _extract_term_entries(payload) is None:
+        raise RuntimeError("ParaTranz terms response has an invalid JSON shape")
+
+    os.makedirs(dest_folder, exist_ok=True)
+    terms_path = os.path.join(dest_folder, f"terms-{current_project_id}.json")
+    with open(terms_path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=4)
+    print(f"Terminology downloaded to {terms_path}")
+    return terms_path
+
+
 def download_function(
     auth_key: str,
     dest_folder: str = "temp/downloads",
@@ -115,6 +165,10 @@ def download_function(
     if zip_path:
         unzip_file(zip_path, dest_folder)
         print(f"Files extracted to {dest_folder}")
+    else:
+        raise RuntimeError("Failed to download ParaTranz translation artifact")
+
+    download_terms(auth_key, dest_folder)
 
 
 def merge_function(dest_folder: str = "temp/downloads"):
