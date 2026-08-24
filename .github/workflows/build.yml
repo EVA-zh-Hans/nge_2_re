@@ -217,8 +217,7 @@ jobs:
           temp/downloads/downloaded.zip
           build/*.xdelta
           build/metadata.png
-          build/evs_report.json
-          build/eboot_report.json
+          build/translation_report.json
           build/release_notes.md
         if-no-files-found: error
 
