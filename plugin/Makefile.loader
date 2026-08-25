@@ -25,3 +25,5 @@ endif
 
 PSPSDK=$(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build.mak
+
+src/loader/ui_draw.o: include/atlas_data.h

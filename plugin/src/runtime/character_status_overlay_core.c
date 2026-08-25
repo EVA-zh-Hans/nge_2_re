@@ -8,8 +8,8 @@ static const char *const g_character_names[EVA2_CHARACTER_COUNT] = {
 };
 
 static const char *const g_stat_labels[EVA2_CHARACTER_STAT_COUNT] = {
-    "AT", "Impulse", "事务", "情报", "白兵", "同步",
-    "饥饿", "水分", "困意", "如厕", "洗澡", "金钱",
+    "AT", "IMPULSE", "事务技能", "情报技能", "白刃技能", "同步技能",
+    "饥饿", "水分", "困意", "ＷＣ", "清洁", "持有金额",
 };
 
 void Eva2CharacterOverlayState_Init(Eva2CharacterOverlayState *state)

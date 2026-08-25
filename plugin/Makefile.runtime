@@ -38,3 +38,5 @@ endif
 
 PSPSDK=$(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build.mak
+
+src/runtime/character_status_overlay.o: include/atlas_data.h

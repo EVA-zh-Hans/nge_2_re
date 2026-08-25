@@ -1,7 +1,7 @@
 #ifndef __ATLAS_DATA_H__
 #define __ATLAS_DATA_H__
 
-#define ATLAS_CHAR_COUNT 170
+#define ATLAS_CHAR_COUNT 174
 
 typedef struct { unsigned short code; unsigned char width; } CharIndex;
 
@@ -85,10 +85,10 @@ static const CharIndex atlas_index[] = {
     { 0x4F5C, 14 },
     { 0x4FE1, 14 },
     { 0x5149, 14 },
-    { 0x5175, 14 },
     { 0x5185, 14 },
     { 0x51AC, 14 },
     { 0x51B2, 14 },
+    { 0x5203, 14 },
     { 0x5206, 14 },
     { 0x5212, 14 },
     { 0x5236, 14 },
@@ -98,7 +98,6 @@ static const CharIndex atlas_index[] = {
     { 0x52A8, 14 },
     { 0x5316, 14 },
     { 0x5355, 14 },
-    { 0x5395, 14 },
     { 0x53F6, 14 },
     { 0x540C, 14 },
     { 0x5411, 14 },
@@ -106,7 +105,6 @@ static const CharIndex atlas_index[] = {
     { 0x55E3, 14 },
     { 0x56F0, 14 },
     { 0x5802, 14 },
-    { 0x5982, 14 },
     { 0x5B50, 14 },
     { 0x5B58, 14 },
     { 0x5B8C, 14 },
@@ -120,6 +118,7 @@ static const CharIndex atlas_index[] = {
     { 0x620F, 14 },
     { 0x6210, 14 },
     { 0x6218, 14 },
+    { 0x6280, 14 },
     { 0x62A5, 14 },
     { 0x6301, 14 },
     { 0x6309, 14 },
@@ -130,19 +129,21 @@ static const CharIndex atlas_index[] = {
     { 0x660E, 14 },
     { 0x663E, 14 },
     { 0x6708, 14 },
+    { 0x6709, 14 },
     { 0x6728, 14 },
     { 0x672C, 14 },
     { 0x6B65, 14 },
     { 0x6C34, 14 },
     { 0x6C49, 14 },
-    { 0x6D17, 14 },
+    { 0x6D01, 14 },
     { 0x6D1E, 14 },
+    { 0x6E05, 14 },
     { 0x6E1A, 14 },
     { 0x6E38, 14 },
     { 0x6E90, 14 },
-    { 0x6FA1, 14 },
     { 0x7248, 14 },
     { 0x72B6, 14 },
+    { 0x7387, 14 },
     { 0x7528, 14 },
     { 0x767D, 14 },
     { 0x771F, 14 },
@@ -152,6 +153,7 @@ static const CharIndex atlas_index[] = {
     { 0x7EDF, 14 },
     { 0x7F8E, 14 },
     { 0x8036, 14 },
+    { 0x80FD, 14 },
     { 0x8109, 14 },
     { 0x81EA, 14 },
     { 0x8272, 14 },
@@ -169,13 +171,15 @@ static const CharIndex atlas_index[] = {
     { 0x8FC7, 14 },
     { 0x91CC, 14 },
     { 0x91D1, 14 },
-    { 0x94B1, 14 },
     { 0x9519, 14 },
     { 0x9752, 14 },
+    { 0x989D, 14 },
     { 0x9965, 14 },
     { 0x997F, 15 },
     { 0x9999, 14 },
     { 0xFF1A, 14 },
+    { 0xFF23, 14 },
+    { 0xFF37, 14 },
 };
 
 #endif

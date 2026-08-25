@@ -385,7 +385,7 @@ void Eva2CharacterStatusOverlay_Draw(
         OVERLAY_PANEL_WIDTH,
         OVERLAY_PANEL_HEIGHT,
         panel_color);
-    Eva2SoftwareRenderer_DrawText(framebuffer, atlas, 10, 9, "角色状态", title_color);
+    Eva2SoftwareRenderer_DrawText(framebuffer, atlas, 10, 9, "角色信息", title_color);
     Eva2SoftwareRenderer_DrawText(framebuffer, atlas, 444, 9, page_buffer, title_color);
 
     Eva2SoftwareRenderer_FillRect(
