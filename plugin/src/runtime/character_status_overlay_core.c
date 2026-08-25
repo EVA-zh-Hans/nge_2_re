@@ -88,7 +88,7 @@ uint32_t Eva2CharacterStatus_Read(
     case EVA2_CHARACTER_STAT_AT:
         return character->at;
     case EVA2_CHARACTER_STAT_IMPULSE:
-        return character->impulse;
+        return character->impulse / 10u;
     case EVA2_CHARACTER_STAT_TRANSACTION:
         return character->transaction;
     case EVA2_CHARACTER_STAT_INTELLIGENCE:
