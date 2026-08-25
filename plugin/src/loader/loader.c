@@ -94,6 +94,7 @@ void drawRect(float x, float y, float w, float h) {
 
 #define PathOldBoot "disc0:/PSP_GAME/SYSDIR/BOOT.BIN"
 #define PathRuntime "disc0:/PSP_GAME/SYSDIR/EVA2RT.PRX"
+#define MENU_ITEM_COUNT 4
 
 int selected_index = 0;
 int last_pad_buttons = 0;
@@ -103,6 +104,7 @@ SceCtrlData pad;
 static int enable_pulse_autowin = 0;
 static int enable_daily_debug = 0;
 static int enable_battle_debug = 0;
+static int enable_60_fps = 0;
 
 void handleInput() {
     sceCtrlPeekBufferPositive(&pad, 1);
@@ -113,11 +115,11 @@ void handleInput() {
 
     if (pressed_buttons & PSP_CTRL_UP) {
         selected_index--;
-        if (selected_index < 0) selected_index = 2;
+        if (selected_index < 0) selected_index = MENU_ITEM_COUNT - 1;
     }
     if (pressed_buttons & PSP_CTRL_DOWN) {
         selected_index++;
-        if (selected_index > 2) selected_index = 0;
+        if (selected_index >= MENU_ITEM_COUNT) selected_index = 0;
     }
     
     // 切换功能开关
@@ -125,6 +127,7 @@ void handleInput() {
         if (selected_index == 0) enable_pulse_autowin = !enable_pulse_autowin;
         if (selected_index == 1) enable_battle_debug = !enable_battle_debug;
         if (selected_index == 2) enable_daily_debug = !enable_daily_debug;
+        if (selected_index == 3) enable_60_fps = !enable_60_fps;
     }
 }
 
@@ -151,11 +154,14 @@ static int main_thread(SceSize args, void *argp)
 
             uiPrint(110, 160, "启用日常调试菜单", (selected_index == 2) ? 0xFF00FFFF : 0xFFFFFFFF);
             uiPrint(250, 160, enable_daily_debug ? "[ON]" : "[OFF]", (selected_index == 2) ? 0xFF00FFFF : 0xFFFFFFFF);
-            
-            uiPrint(150, 200, "按 START 键启动游戏", 0xFF00AAFF);
 
-            uiPrint(150, 220, "EVA2 汉化计划 2026", 0xFF00AAFF);
-            uiPrint(150, 235, "插件制作：main_void", 0xFF00AAFF);
+            uiPrint(110, 185, "60FPS", (selected_index == 3) ? 0xFF00FFFF : 0xFFFFFFFF);
+            uiPrint(250, 185, enable_60_fps ? "[ON]" : "[OFF]", (selected_index == 3) ? 0xFF00FFFF : 0xFFFFFFFF);
+            
+            uiPrint(150, 210, "按 START 键启动游戏", 0xFF00AAFF);
+
+            uiPrint(150, 230, "EVA2 汉化计划 2026", 0xFF00AAFF);
+            uiPrint(150, 245, "插件制作：main_void", 0xFF00AAFF);
         }
 		endFrame();
 
@@ -182,6 +188,9 @@ static int main_thread(SceSize args, void *argp)
         }
         if (enable_daily_debug) {
             runtime_args.flags |= EVA2_FLAG_DAILY_DEBUG;
+        }
+        if (enable_60_fps) {
+            runtime_args.flags |= EVA2_FLAG_60_FPS;
         }
 
         if (runtime_mid >= 0) {

@@ -32,6 +32,7 @@ set(RUNTIME_SOURCES
     src/runtime/patches/savedata_patch.c
     src/runtime/patches/message_dialog_patch.c
     src/runtime/patches/debug_patch.c
+    src/runtime/patches/frame_rate_patch.c
     src/runtime/patches/runtime_log.c
     src/runtime/patches/staff_roll_patch.c
     src/runtime/patches/memtalk/memtalk_patch.c
