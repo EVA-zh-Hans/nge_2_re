@@ -2,6 +2,9 @@ TARGET = EVA2RT
 ATTR = PRX
 
 OBJS = src/runtime/runtime_entry.o src/runtime/runtime_patch.o src/runtime/hook_write.o\
+ src/runtime/character_status_overlay.o\
+ src/runtime/character_status_overlay_core.o\
+ src/runtime/character_status_renderer.o\
  src/runtime/patches/text_encoding_patch.o\
  src/runtime/patches/sentence_patch.o\
  src/runtime/patches/external_translation_patch.o\
@@ -14,12 +17,13 @@ OBJS = src/runtime/runtime_entry.o src/runtime/runtime_patch.o src/runtime/hook_
  src/runtime/patches/memtalk/memtalk_patch.o\
  src/runtime/patches/memtalk/memtalk_game_calls.o\
  src/runtime/patches/memtalk/memtalk_templates.o\
- src/transform.o src/bin/gb2312.o src/bin/sjis.o src/bin/utf16.o\
+ src/transform.o src/bin/atlas.o src/bin/gb2312.o src/bin/sjis.o src/bin/utf16.o\
  src/utils/log.o src/sceLibFont.o src/scefttt.o src/psputil.o
 
 CFLAGS = -O2 -G0 -Wall -fno-pic
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 LDFLAGS = -nostartfiles
+LIBS = -lpspdisplay -lpspctrl
 
 ASFLAGS = -DF_sceLibFont_0000 -DF_sceLibFont_0003 -DF_sceLibFont_0014 -DF_sceLibFont_0017
 
@@ -34,3 +38,5 @@ endif
 
 PSPSDK=$(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build.mak
+
+src/runtime/character_status_overlay.o: include/atlas_data.h
