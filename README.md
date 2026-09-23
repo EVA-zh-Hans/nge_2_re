@@ -8,11 +8,11 @@
 </h3>
 
 <p align="center">
-| <a href="https://paratranz.cn/projects/10882"><b>翻译平台</b></a> 
-| <a href="https://github.com/rezual/nge_2_re/"><b>原项目</b></a> 
-| <a href="https://forum.evageeks.org/thread/1393/Game-Neon-Genesis-Evangelion-2-Another-Cases/700/"><b>原帖</b></a> 
-| <a href="https://github.com/xeonliu/nge_2_re/discussions"><b>讨论区</b></a> 
-| <a href="https://github.com/xeonliu/nge_2_re/issues"><b>反馈问题</b></a> 
+| <a href="https://paratranz.cn/projects/10882"><b>翻译平台</b></a>
+| <a href="https://github.com/rezual/nge_2_re/"><b>原项目</b></a>
+| <a href="https://forum.evageeks.org/thread/1393/Game-Neon-Genesis-Evangelion-2-Another-Cases/700/"><b>原帖</b></a>
+| <a href="https://github.com/EVA-zh-Hans/nge_2_re/discussions"><b>讨论区</b></a>
+| <a href="https://github.com/EVA-zh-Hans/nge_2_re/issues"><b>反馈问题</b></a>
 | <a href="https://deepwiki.com/EVA-zh-Hans/nge_2_re"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
 |
 </p>
@@ -185,23 +185,45 @@ docker run -it --rm -v $(pwd):/app -w /app pspdev-dev
 
 ## 🎮 使用指南
 
-目前，补丁以 [xdelta3](https://github.com/jmacd/xdelta) 格式发布。
+补丁以 [xdelta3](https://github.com/jmacd/xdelta) 格式在 [GitHub Releases](https://github.com/EVA-zh-Hans/nge_2_re/releases) 发布。下载与你的原始镜像版本（`ULJS00064` 或 `ULJS00061`）对应的 `.xdelta` 文件。
 
-桌面端可以使用 [DeltaPatcher](https://github.com/marco-calautti/DeltaPatcher)，网页端可以使用 [xdelta-wasm](https://kotcrab.github.io/xdelta-wasm/) 打补丁，使用步骤如下：
+### 准备原始镜像
 
-1. 获取适用的镜像（使用正版 UMD 光盘和已破解的 PSP 提取 ISO 镜像，参考 [miscdumpingguides](https://miscdumpingguides.miraheze.org/wiki/PlayStation_Portable_Physical_Software_Dumping_Guide)）
-2. 从 GitHub Release 下载对应版本的补丁
-3. 打开 DeltaPatcher 或 xdelta-wasm
-4. 依次打开适用的镜像和对应的补丁文件，点击`Apply Patch`或对应按键
-5. 程序会自动生成新的 ISO 镜像文件，该镜像文件可以在 PPSSPP 模拟器或 PSP 实机上加载
+使用正版 UMD 光盘和已破解的 PSP 提取 ISO 镜像，操作可参考 [UMD 镜像转储指南](https://miscdumpingguides.miraheze.org/wiki/PlayStation_Portable_Physical_Software_Dumping_Guide)。打补丁前，请核对原始镜像的 CRC32：
+
+| 镜像版本 | 原始镜像 CRC32 |
+| --- | --- |
+| ULJS00064 | `1C8AF7DD` |
+| ULJS00061 | `FA548951` |
+
+如果校验值不一致，请先确认镜像版本和转储是否正确；已知转储问题的修复方法见[网站使用指南](https://eva-zh-hans.github.io/nge_2_re/usage/)。
+
+### 应用补丁
+
+推荐使用网页端 [xdelta-wasm](https://kotcrab.github.io/xdelta-wasm/)，镜像与补丁的处理均在本地浏览器中完成，无需上传文件：
+
+1. 在 **Source file** 处选择校验通过的原始 ISO 镜像。
+2. 在 **Patch file** 处选择与镜像版本对应的 `.xdelta` 补丁文件。
+3. 点击 **Apply**，生成并保存汉化后的 ISO 镜像。
+4. 在 PPSSPP 模拟器或 PSP 实机上加载汉化后的 ISO。
+
+桌面端也可以使用 [DeltaPatcher](https://github.com/marco-calautti/DeltaPatcher)：选择原始镜像和对应补丁后，点击 **Apply patch**。操作前请备份原始镜像，以免被覆盖。
 
 ### PPSSPP 模拟器
 
-* iOS 设备推荐将 CPU 核心模式改为 “解释器” 以减少 JIT 带来的性能损失
+* 打开 PPSSPP，加载汉化后的 ISO 即可运行。
+* 若运行时缺字或部分文本内部文字错乱，可尝试将 `游戏设置 → 渲染引擎` 改为 `Vulkan`（设备支持时）。
+* iOS 设备若运行时出现卡顿，可尝试将 CPU 核心模式切换为“解释器”
 
 ### PSP 实机
 
 * 需要已破解设备（推荐 **ARK-4**），可直接运行补丁版镜像。
+
+### 启动菜单与问题反馈
+
+游戏开始前会显示功能选择菜单，使用方向键切换选项、○ 键启用或禁用功能，按 **START** 显示汉化成员名单并进入游戏。调试功能的具体说明及常见问题见[网站使用指南](https://eva-zh-hans.github.io/nge_2_re/usage/)。
+
+补丁仍处于测试阶段。如遇卡死、闪退、翻译错误或剧情异常，请在 [GitHub Issues](https://github.com/EVA-zh-Hans/nge_2_re/issues) 反馈，并附上补丁版本、运行环境、触发步骤，以及相关截图和存档，方便复现。
 
 ---
 
@@ -227,7 +249,7 @@ docker run -it --rm -v $(pwd):/app -w /app pspdev-dev
 
 ## 💬 联系我们
 
-* 技术问题与功能请求请提交 [GitHub Issues](https://github.com/xeonliu/nge_2_re/issues)
+* 技术问题与功能请求请提交 [GitHub Issues](https://github.com/EVA-zh-Hans/nge_2_re/issues)
 * 翻译交流请加入 [Paratranz 社区](https://paratranz.cn/projects/10882)
 <!-- * 项目合作与联络：[eva2-translation@proton.me](mailto:eva2-translation@proton.me) -->
 
