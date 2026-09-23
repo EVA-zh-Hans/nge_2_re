@@ -13,6 +13,6 @@ export default defineConfig({
       },
     }],
   },
-  site: 'https://xeonliu.github.io',
+  site: 'https://eva-zh-hans.github.io',
   base: '/nge_2_re'
 });
