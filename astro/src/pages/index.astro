@@ -1,5 +1,6 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import PspHero from "../components/PspHero.astro";
 const allPosts = (
   await Astro.glob(["./posts/*.md", "./posts/*.mdx"])
 ).sort(
@@ -7,47 +8,12 @@ const allPosts = (
     new Date(b.frontmatter.pubDate || "2024-01-01") -
     new Date(a.frontmatter.pubDate || "2024-01-01")
 );
-import icon from "./posts/assets/logo.png";
 ---
 
 <Layout title="EVA2 汉化计划">
-  <div id="main-content" class="p-section--hero">
-    <div class="row--25-75">
-      <div class="col">
-        <img
-          src={icon.src}
-          alt="EVA2 汉化计划 Logo"
-          style="max-width: 90px; min-width: 60px; width: 12vw; height: auto;"
-        />
-        <div>
-          <div class="p-section--shallow" style="margin-bottom: 0.5rem;">
-            <h1 style="margin-bottom: 0.2em;">欢迎来到</h1>
-            <h2 style="margin-bottom: 0.2em;">EVA2 汉化计划</h2>
-            <h1 style="margin-bottom: 0;">的官网</h1>
-          </div>
-          <div class="p-section--shallow">
-            <ul class="p-inline-list u-no-margin--bottom">
-              <li class="p-inline-list__item">
-                <a
-                  href="/nge_2_re/download"
-                  class="p-button--positive u-no-margin--bottom"
-                  >下载补丁</a
-                >
-              </li>
-              <li class="p-inline-list__item">
-                <a
-                  href="/nge_2_re/contribute"
-                  class="p-button u-no-margin--bottom">贡献翻译</a
-                >
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <PspHero />
 
-  <div class="p-strip">
+  <div class="p-strip" id="resources">
     <div class="row">
       <div class="col-4">
         <h2>资源下载</h2>

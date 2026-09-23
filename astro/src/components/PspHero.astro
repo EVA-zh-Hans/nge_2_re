@@ -1,0 +1,118 @@
+---
+import screenshot from "../pages/posts/assets/v2.0.0-beta.1-01.png";
+import { getImage } from "astro:assets";
+const screen = await getImage({ src: screenshot, width: 1440, format: "webp", quality: 85 });
+---
+
+<section id="main-content" class="psp-hero" aria-labelledby="hero-title" data-psp-hero>
+  <div class="psp-hero__sticky">
+    <div class="psp-hero__grid" aria-hidden="true"></div>
+    <div class="psp-hero__orb" aria-hidden="true"></div>
+
+    <div class="psp-hero__copy">
+      <p class="psp-hero__eyebrow"><span></span> 那个世界，触手可及</p>
+      <h1 id="hero-title"><span class="psp-hero__title-en">EVANGELION</span><span class="psp-hero__title-cn">彻底<span class="psp-hero__title-red">重生</span></span></h1>
+      <p class="psp-hero__subtitle">EVA2 汉化计划</p>
+      <p class="psp-hero__description">重回《新世纪福音战士2：被创造的世界》，<br class="desktop-break" />用中文，走进属于你的另一种故事。</p>
+      <div class="psp-hero__actions">
+        <a class="psp-hero__primary" href="/nge_2_re/download">下载汉化补丁 <span aria-hidden="true">↗</span></a>
+        <a class="psp-hero__secondary" href="/nge_2_re/contribute">参与翻译 <span aria-hidden="true">↗</span></a>
+      </div>
+    </div>
+
+    <div class="psp-hero__stage" role="img" aria-label="黑色 PSP 立体模型，屏幕展示 EVA2 中文汉化游戏截图" data-psp-stage data-screen={screen.src}>
+      <div class="psp-fallback" aria-hidden="true">
+        <span class="psp-fallback__pad">✚</span>
+        <img src={screen.src} width={screenshot.width} height={screenshot.height} alt="" fetchpriority="high" />
+        <span class="psp-fallback__keys">△<br />□ ○<br />×</span>
+        <span class="psp-fallback__brand">P S P</span>
+      </div>
+    </div>
+
+    <div class="psp-hero__caption" aria-hidden="true"><span>再一次，进入被创造的世界。</span><small>YOUR WORLD. YOUR ANOTHER CASE.</small></div>
+    <div class="psp-hero__bottomline">
+      <a href="#resources" class="psp-hero__scroll"><span aria-hidden="true">↓</span><span class="psp-hero__scroll-label">探索汉化计划</span></a>
+      <div class="psp-hero__progress" aria-hidden="true"><span></span></div>
+      <button type="button" class="psp-hero__motion" aria-pressed="false" hidden>暂停动态效果</button>
+      <span class="psp-hero__edition">造られしセカイ / another cases</span>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { initPspHero } from "./psp/scene.js";
+  const hero = document.querySelector<HTMLElement>("[data-psp-hero]");
+  if (hero) initPspHero(hero);
+</script>
+
+<style>
+  .psp-hero { --accent: #c90012; --progress: 0; --copy-opacity: 1; --caption-opacity: 0; position: relative; background: #f5f4f3; color: #171717; }
+  .psp-hero.is-ready:not(.is-static) { height: 240svh; }
+  .psp-hero__sticky { position: sticky; top: 0; height: min(900px, 100svh); min-height: 620px; overflow: hidden; isolation: isolate; }
+  .psp-hero__grid { position: absolute; inset: 0; z-index: -2; background-image: linear-gradient(#27232309 1px, transparent 1px), linear-gradient(90deg, #27232309 1px, transparent 1px); background-size: 64px 64px; mask-image: linear-gradient(90deg, transparent, #000); }
+  .psp-hero__orb { position: absolute; z-index: -1; width: 62vw; height: 62vw; max-height: 950px; right: -9%; top: -12%; border-radius: 50%; background: radial-gradient(circle, #e8cece80, #eae5e355 48%, transparent 69%); }
+  .psp-hero__bottomline { position: absolute; left: 5%; right: 5%; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+  .psp-hero__copy { position: absolute; z-index: 2; top: 50%; left: 7%; transform: translateY(-50%); width: 40%; opacity: var(--copy-opacity); }
+  .psp-hero__eyebrow { display: flex; align-items: center; gap: 10px; color: #5e5555; font-size: 12px; letter-spacing: .15em; margin-bottom: 28px; }
+  .psp-hero__eyebrow span { width: 7px; height: 7px; background: #c90012; border-radius: 50%; box-shadow: 0 0 0 4px #c9001214; }
+  .psp-hero h1 { color: #111; font-family: "Songti SC", "STSong", "Noto Serif CJK SC", SimSun, serif; line-height: 1.08; font-weight: 900; margin: 0 0 25px; }
+  .psp-hero__title-en { display: block; font-family: Georgia, "Times New Roman", serif; font-size: clamp(28px, 3.5vw, 56px); font-weight: 900; letter-spacing: -.055em; }
+  .psp-hero__title-cn { display: block; margin-top: 10px; font-size: clamp(48px, 6.5vw, 102px); letter-spacing: -.075em; white-space: nowrap; }
+  .psp-hero__title-red { color: var(--accent); }
+  .psp-hero__subtitle { font-size: 18px; font-weight: 550; margin-bottom: 12px; letter-spacing: .08em; }
+  .psp-hero__description { color: #6e6666; font-size: 14px; line-height: 1.9; }
+  .psp-hero__actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+  .psp-hero__actions a { display: inline-flex; align-items: center; gap: 20px; padding: 13px 20px; border-radius: 4px; font-size: 13px; text-decoration: none; transition: background .2s; }
+  .psp-hero__primary { background: var(--accent); color: white; }
+  .psp-hero__primary:hover { background: #a6000f; color: white; }
+  .psp-hero__secondary { color: #252121; border: 1px solid #d8cece; }
+  .psp-hero__secondary:hover { background: #eee3e3; }
+  .psp-hero a:focus-visible, .psp-hero button:focus-visible { outline: 3px solid var(--accent); outline-offset: 5px; }
+  .psp-hero__stage { position: absolute; inset: 0; pointer-events: none; }
+  .psp-hero__stage :global(canvas) { display: block; width: 100%; height: 100%; opacity: 0; }
+  .is-ready .psp-hero__stage :global(canvas) { opacity: 1; }
+  .psp-fallback { position: absolute; width: 49%; aspect-ratio: 2.35; top: 50%; right: 4%; transform: translateY(-50%) rotate(-9deg); border-radius: 20% / 44%; background: linear-gradient(155deg, #434449, #141519 45%, #29292e); border: 3px solid #7a7b82; box-shadow: 0 12px 0 #16171a, 15px 45px 45px #39304030; display: flex; align-items: center; justify-content: space-evenly; color: #b9b9c3; }
+  .psp-fallback img { width: 59%; border: 7px solid #090a0c; margin: 0; border-radius: 3px; }
+  .psp-fallback__pad { font-size: clamp(20px, 4vw, 55px); }
+  .psp-fallback__keys { text-align: center; line-height: 1; font-size: clamp(10px, 1.5vw, 22px); }
+  .psp-fallback__brand { position: absolute; bottom: 3%; font: italic 12px sans-serif; }
+  .is-ready .psp-fallback { display: none; }
+  .psp-hero__caption { position: absolute; bottom: 16%; width: 100%; text-align: center; opacity: var(--caption-opacity); pointer-events: none; }
+  .psp-hero__caption span { display: block; font-size: clamp(18px, 2.1vw, 30px); letter-spacing: .15em; }
+  .psp-hero__caption small { display: block; margin-top: 10px; font: 10px monospace; letter-spacing: .22em; color: #827474; }
+  .psp-hero__bottomline { bottom: 28px; z-index: 3; color: #817575; font-size: 10px; }
+  .psp-hero__scroll { display: flex; align-items: center; gap: 12px; color: #625656; text-decoration: none; white-space: nowrap; }
+  .psp-hero__scroll > span:first-child { display: grid; place-items: center; border: 1px solid #d0c4c4; border-radius: 50%; width: 30px; height: 38px; font-size: 17px; }
+  .psp-hero__progress { width: 100px; height: 2px; background: #e1d6d6; margin-right: auto; display: none; }
+  .psp-hero__progress span { display: block; height: 100%; background: var(--accent); transform: scaleX(var(--progress)); transform-origin: left; }
+  .is-ready:not(.is-static) .psp-hero__progress { display: block; }
+  .psp-hero__motion { border: 0; background: transparent; font: inherit; color: #625656; padding: 8px; margin: 0; min-height: 36px; width: auto; }
+  .psp-hero__motion[hidden] { display: none; }
+  .psp-hero__edition { font: 10px monospace; letter-spacing: .08em; }
+  @media (min-width: 1800px) { .psp-hero__copy { left: max(7%, calc((100vw - 1600px) / 2)); } }
+  @media (max-width: 760px) {
+    .psp-hero__sticky { height: 100svh; min-height: 700px; max-height: 980px; }
+    .psp-hero.is-ready:not(.is-static) { height: 210svh; }
+    .psp-hero__copy { top: 75px; left: 7%; width: 86%; transform: none; }
+    .psp-hero__eyebrow { margin-bottom: 18px; font-size: 11px; }
+    .psp-hero h1 { margin-bottom: 16px; }
+    .psp-hero__title-en { font-size: clamp(27px, 8.2vw, 44px); }
+    .psp-hero__title-cn { font-size: clamp(48px, 14vw, 76px); }
+    .psp-hero__subtitle { font-size: 15px; margin-bottom: 8px; }
+    .psp-hero__description { font-size: 12px; }
+    .psp-hero__actions { margin-top: 18px; gap: 8px; }
+    .psp-hero__actions a { padding: 10px 14px; font-size: 12px; }
+    .psp-hero__stage { top: 43%; bottom: 11%; }
+    .psp-fallback { width: 88%; right: 6%; }
+    .psp-hero__orb { top: 30%; right: -30%; width: 125vw; height: 125vw; }
+    .psp-hero__caption { bottom: 15%; }
+    .psp-hero__edition { display: none; }
+    .psp-hero__bottomline { bottom: 22px; gap: 12px; }
+    .psp-hero__progress { width: 40px; }
+    .psp-hero__scroll { font-size: 10px; gap: 7px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .psp-hero.is-ready:not(.is-static) { height: auto; }
+    .psp-hero__actions a { transition: none; }
+  }
+</style>
