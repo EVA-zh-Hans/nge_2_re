@@ -4,6 +4,15 @@ import mdx from '@astrojs/mdx';
 export default defineConfig({
   // ...
   integrations: [react(), mdx()],
+  vite: {
+    plugins: [{
+      name: 'separate-dev-build-cache',
+      config(_config, { command }) {
+        // Builds must not replace React dependencies used by a running dev server.
+        return { cacheDir: `node_modules/.vite-${command}` };
+      },
+    }],
+  },
   site: 'https://xeonliu.github.io',
   base: '/nge_2_re'
 });

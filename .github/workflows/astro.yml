@@ -5,7 +5,7 @@
 name: Deploy Astro site to Pages
 
 on:
-  # Runs on pushes targeting the default branch
+  # Runs on pushes targeting the docs branch
   push:
     branches: ["docs"]
 
@@ -30,6 +30,7 @@ env:
 
 jobs:
   build:
+    if: github.ref == 'refs/heads/docs'
     name: Build
     runs-on: ubuntu-latest
     steps:
@@ -60,6 +61,9 @@ jobs:
           node-version: "20"
           cache: ${{ steps.detect-package-manager.outputs.manager }}
           cache-dependency-path: ${{ env.BUILD_PATH }}/${{ steps.detect-package-manager.outputs.lockfile }}
+      - name: Update translation progress and leaderboard from ParaTranz
+        run: node scripts/update-paratranz.mjs
+        working-directory: ${{ env.BUILD_PATH }}
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v5
