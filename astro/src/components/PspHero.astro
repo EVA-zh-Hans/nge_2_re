@@ -31,9 +31,6 @@ const screen = await getImage({ src: screenshot, width: 1440, format: "webp", qu
 
     <div class="psp-hero__caption" aria-hidden="true"><span>再一次，进入被创造的世界。</span><small>YOUR WORLD. YOUR ANOTHER CASE.</small></div>
     <div class="psp-hero__bottomline">
-      <a href="#resources" class="psp-hero__scroll"><span aria-hidden="true">↓</span><span class="psp-hero__scroll-label">探索汉化计划</span></a>
-      <div class="psp-hero__progress" aria-hidden="true"><span></span></div>
-      <button type="button" class="psp-hero__motion" aria-pressed="false" hidden>暂停动态效果</button>
       <span class="psp-hero__edition">造られしセカイ / another cases</span>
     </div>
   </div>
@@ -46,12 +43,12 @@ const screen = await getImage({ src: screenshot, width: 1440, format: "webp", qu
 </script>
 
 <style>
-  .psp-hero { --accent: #c90012; --progress: 0; --copy-opacity: 1; --caption-opacity: 0; position: relative; background: #f5f4f3; color: #171717; }
+  .psp-hero { --accent: #c90012; --copy-opacity: 1; --caption-opacity: 0; position: relative; background: #f5f4f3; color: #171717; }
   .psp-hero.is-ready:not(.is-static) { height: 240svh; }
   .psp-hero__sticky { position: sticky; top: 0; height: min(900px, 100svh); min-height: 620px; overflow: hidden; isolation: isolate; }
   .psp-hero__grid { position: absolute; inset: 0; z-index: -2; background-image: linear-gradient(#27232309 1px, transparent 1px), linear-gradient(90deg, #27232309 1px, transparent 1px); background-size: 64px 64px; mask-image: linear-gradient(90deg, transparent, #000); }
   .psp-hero__orb { position: absolute; z-index: -1; width: 62vw; height: 62vw; max-height: 950px; right: -9%; top: -12%; border-radius: 50%; background: radial-gradient(circle, #e8cece80, #eae5e355 48%, transparent 69%); }
-  .psp-hero__bottomline { position: absolute; left: 5%; right: 5%; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+  .psp-hero__bottomline { position: absolute; left: 5%; right: 5%; display: flex; align-items: center; justify-content: flex-end; }
   .psp-hero__copy { position: absolute; z-index: 2; top: 50%; left: 7%; transform: translateY(-50%); width: 40%; opacity: var(--copy-opacity); }
   .psp-hero__eyebrow { display: flex; align-items: center; gap: 10px; color: #5e5555; font-size: 12px; letter-spacing: .15em; margin-bottom: 28px; }
   .psp-hero__eyebrow span { width: 7px; height: 7px; background: #c90012; border-radius: 50%; box-shadow: 0 0 0 4px #c9001214; }
@@ -67,7 +64,7 @@ const screen = await getImage({ src: screenshot, width: 1440, format: "webp", qu
   .psp-hero__primary:hover { background: #a6000f; color: white; }
   .psp-hero__secondary { color: #252121; border: 1px solid #d8cece; }
   .psp-hero__secondary:hover { background: #eee3e3; }
-  .psp-hero a:focus-visible, .psp-hero button:focus-visible { outline: 3px solid var(--accent); outline-offset: 5px; }
+  .psp-hero a:focus-visible { outline: 3px solid var(--accent); outline-offset: 5px; }
   .psp-hero__stage { position: absolute; inset: 0; pointer-events: none; }
   .psp-hero__stage :global(canvas) { display: block; width: 100%; height: 100%; opacity: 0; }
   .is-ready .psp-hero__stage :global(canvas) { opacity: 1; }
@@ -81,13 +78,6 @@ const screen = await getImage({ src: screenshot, width: 1440, format: "webp", qu
   .psp-hero__caption span { display: block; font-size: clamp(18px, 2.1vw, 30px); letter-spacing: .15em; }
   .psp-hero__caption small { display: block; margin-top: 10px; font: 10px monospace; letter-spacing: .22em; color: #827474; }
   .psp-hero__bottomline { bottom: 28px; z-index: 3; color: #817575; font-size: 10px; }
-  .psp-hero__scroll { display: flex; align-items: center; gap: 12px; color: #625656; text-decoration: none; white-space: nowrap; }
-  .psp-hero__scroll > span:first-child { display: grid; place-items: center; border: 1px solid #d0c4c4; border-radius: 50%; width: 30px; height: 38px; font-size: 17px; }
-  .psp-hero__progress { width: 100px; height: 2px; background: #e1d6d6; margin-right: auto; display: none; }
-  .psp-hero__progress span { display: block; height: 100%; background: var(--accent); transform: scaleX(var(--progress)); transform-origin: left; }
-  .is-ready:not(.is-static) .psp-hero__progress { display: block; }
-  .psp-hero__motion { border: 0; background: transparent; font: inherit; color: #625656; padding: 8px; margin: 0; min-height: 36px; width: auto; }
-  .psp-hero__motion[hidden] { display: none; }
   .psp-hero__edition { font: 10px monospace; letter-spacing: .08em; }
   @media (min-width: 1800px) { .psp-hero__copy { left: max(7%, calc((100vw - 1600px) / 2)); } }
   @media (max-width: 760px) {
@@ -108,8 +98,6 @@ const screen = await getImage({ src: screenshot, width: 1440, format: "webp", qu
     .psp-hero__caption { bottom: 15%; }
     .psp-hero__edition { display: none; }
     .psp-hero__bottomline { bottom: 22px; gap: 12px; }
-    .psp-hero__progress { width: 40px; }
-    .psp-hero__scroll { font-size: 10px; gap: 7px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .psp-hero.is-ready:not(.is-static) { height: auto; }

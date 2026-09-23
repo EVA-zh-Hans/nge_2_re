@@ -3,8 +3,6 @@ import { createPsp } from './model.js';
 
 export async function initPspHero(hero) {
   const stage = hero.querySelector('[data-psp-stage]');
-  const motionButton = hero.querySelector('.psp-hero__motion');
-  const scrollLabel = hero.querySelector('.psp-hero__scroll-label');
   const copy = hero.querySelector('.psp-hero__copy');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const mobile = window.matchMedia('(max-width: 760px)');
@@ -14,7 +12,6 @@ export async function initPspHero(hero) {
   let disposed = false;
   let frame = 0;
   let visible = true;
-  let paused = false;
   let progress = 0;
   let target = 0;
   let pointerX = 0;
@@ -27,7 +24,6 @@ export async function initPspHero(hero) {
   let resizeObserver;
   const camera = new THREE.PerspectiveCamera(33, 1, .1, 100);
   const cleanups = [];
-  const staticMode = () => paused || reducedMotion.matches;
   const clamp = (n) => Math.max(0, Math.min(1, n));
   const smooth = (n) => n * n * (3 - 2 * n);
 
@@ -65,8 +61,6 @@ export async function initPspHero(hero) {
     hero.style.setProperty('--caption-opacity', '0');
     copy.inert = false;
     copy.removeAttribute('aria-hidden');
-    motionButton.hidden = true;
-    scrollLabel.textContent = '探索汉化计划';
   }
   function requestFrame() {
     if (!disposed && visible && !document.hidden && !frame) frame = requestAnimationFrame(render);
@@ -74,7 +68,7 @@ export async function initPspHero(hero) {
   function updateTarget() {
     const rect = hero.getBoundingClientRect();
     const distance = hero.offsetHeight - hero.querySelector('.psp-hero__sticky').offsetHeight;
-    target = reducedMotion.matches ? 0 : paused ? progress : clamp(-rect.top / Math.max(1, distance));
+    target = reducedMotion.matches ? 0 : clamp(-rect.top / Math.max(1, distance));
     requestFrame();
   }
   function resize() {
@@ -96,8 +90,8 @@ export async function initPspHero(hero) {
     lastTime = time;
     const blend = 1 - Math.exp(-dt * 11);
     progress = reducedMotion.matches ? 0 : THREE.MathUtils.lerp(progress, target, blend);
-    currentX = staticMode() ? 0 : THREE.MathUtils.lerp(currentX, pointerX, blend);
-    currentY = staticMode() ? 0 : THREE.MathUtils.lerp(currentY, pointerY, blend);
+    currentX = reducedMotion.matches ? 0 : THREE.MathUtils.lerp(currentX, pointerX, blend);
+    currentY = reducedMotion.matches ? 0 : THREE.MathUtils.lerp(currentY, pointerY, blend);
     const approach = smooth(progress);
     // The first half turns the face toward the viewer; the second half pushes it forward.
     const turn = smooth(clamp(progress * 1.65));
@@ -109,7 +103,6 @@ export async function initPspHero(hero) {
     model.position.set(mobile.matches ? 0 : 2.95 * (1 - approach), mobile.matches ? .2 + approach * .8 : approach * .75, camera.position.z * (mobile.matches ? .08 : .22) * approach);
     model.scale.setScalar(1 + approach * (mobile.matches ? .02 : .16));
     const opacity = 1 - smooth(clamp(progress / .35));
-    hero.style.setProperty('--progress', progress.toFixed(4));
     hero.style.setProperty('--copy-opacity', opacity.toFixed(4));
     hero.style.setProperty('--caption-opacity', smooth(clamp((progress - .58) / .3)).toFixed(4));
     copy.inert = opacity < .05;
@@ -120,12 +113,6 @@ export async function initPspHero(hero) {
   function syncMotion() {
     hero.classList.toggle('is-static', reducedMotion.matches);
     pointerX = 0; pointerY = 0;
-    motionButton.setAttribute('aria-pressed', String(staticMode()));
-    motionButton.textContent = staticMode() ? '动态效果已关闭' : '暂停动态效果';
-    // Honor the system preference; the toggle stays available when motion is permitted.
-    motionButton.hidden = reducedMotion.matches;
-    if (paused && !reducedMotion.matches) motionButton.textContent = '开启动态效果';
-    scrollLabel.textContent = staticMode() ? '探索汉化计划' : '向下滚动，进入世界';
     resize();
   }
 
@@ -164,9 +151,8 @@ export async function initPspHero(hero) {
     listen(window, 'scroll', updateTarget, { passive: true });
     listen(reducedMotion, 'change', syncMotion);
     listen(mobile, 'change', resize);
-    listen(motionButton, 'click', () => { paused = !paused; syncMotion(); });
     listen(hero, 'pointermove', (event) => {
-      if (staticMode() || event.pointerType !== 'mouse') return;
+      if (reducedMotion.matches || event.pointerType !== 'mouse') return;
       const rect = hero.querySelector('.psp-hero__sticky').getBoundingClientRect();
       pointerX = (event.clientX - rect.left) / rect.width - .5;
       pointerY = (event.clientY - rect.top) / rect.height - .5;
