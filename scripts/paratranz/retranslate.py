@@ -161,6 +161,25 @@ def history_for_string(history: Iterable[dict[str, Any]], string_id: int) -> lis
     return sorted(matches, key=lambda item: json.dumps(item, ensure_ascii=False, sort_keys=True))
 
 
+def manual_translation_history(history: Iterable[dict[str, Any]], string_id: int) -> list[dict[str, Any]]:
+    return [
+        item for item in history_for_string(history, string_id)
+        if item.get("field") == "translation" and item.get("operation") != "import"
+    ]
+
+
+def has_translation_import(history: Iterable[dict[str, Any]], string_id: int) -> bool:
+    return any(
+        item.get("field") == "translation" and item.get("operation") == "import"
+        for item in history_for_string(history, string_id)
+    )
+
+
+def manual_translation_fingerprint(history: Iterable[dict[str, Any]], string_id: int) -> str:
+    encoded = json.dumps(manual_translation_history(history, string_id), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
 def history_fingerprint(history: Iterable[dict[str, Any]], string_id: int) -> str:
     encoded = json.dumps(history_for_string(history, string_id), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
@@ -418,7 +437,9 @@ def create_preview(args: argparse.Namespace, client: ParaTranzClient, llm_sessio
             status, reason = "skipped", "history_id_unmatched"
         elif not isinstance(original, str) or not original.strip():
             status, reason = "skipped", "empty_original"
-        elif any(row.get("field") == "translation" for row in own_history):
+        elif item.get("stage") != 1:
+            status, reason = "skipped", "stage_not_one"
+        elif manual_translation_history(own_history, string_id):
             status, reason = "skipped", "translation_was_edited"
         else:
             status, reason = "pending", None
@@ -430,6 +451,7 @@ def create_preview(args: argparse.Namespace, client: ParaTranzClient, llm_sessio
             "stage": item.get("stage"),
             "context": item.get("context") or "",
             "history_fingerprint": history_fingerprint(own_history, string_id),
+            "manual_translation_fingerprint": manual_translation_fingerprint(own_history, string_id),
             "status": status,
             "reason": reason,
             "translation": None,
@@ -504,10 +526,13 @@ def watch_apply(args: argparse.Namespace, client: ParaTranzClient) -> None:
     if not results_path.exists():
         raise FileNotFoundError(f"Results file does not exist: {results_path}")
 
+    previous_state = None
     if state_path.exists():
-        state = json.loads(state_path.read_text(encoding="utf-8"))
-        if state.get("file_id") != args.file_id:
+        previous_state = json.loads(state_path.read_text(encoding="utf-8"))
+        if previous_state.get("file_id") != args.file_id:
             raise ValueError("Saved watch state belongs to a different ParaTranz file")
+    if previous_state is not None and not args.rebuild_state:
+        state = previous_state
         terms = _terms(client.fetch_terms())
         retried = 0
         for entry in state.get("candidates", {}).values():
@@ -547,7 +572,9 @@ def watch_apply(args: argparse.Namespace, client: ParaTranzClient) -> None:
                 reason = "history_id_unmatched"
             elif not isinstance(original, str) or not original.strip():
                 reason = "empty_original"
-            elif any(row.get("field") == "translation" for row in own_history):
+            elif item.get("stage") != 1:
+                reason = "stage_not_one"
+            elif manual_translation_history(own_history, string_id):
                 reason = "translation_was_edited"
             else:
                 reason = None
@@ -562,6 +589,7 @@ def watch_apply(args: argparse.Namespace, client: ParaTranzClient) -> None:
                 "old_translation": item.get("translation") or "",
                 "stage": item.get("stage"),
                 "history_fingerprint": history_fingerprint(own_history, string_id),
+                "manual_translation_fingerprint": manual_translation_fingerprint(own_history, string_id),
                 "status": "pending",
                 "validation": [],
             }
@@ -570,13 +598,27 @@ def watch_apply(args: argparse.Namespace, client: ParaTranzClient) -> None:
             if key_counts[entry["key"]] > 1:
                 blocked[string_id] = "duplicate_file_key"
                 del candidates[string_id]
+        model = (previous_state or {}).get("model") or os.environ.get("OAI_MODEL") or os.environ.get("OPENAI_MODEL")
+        resumed = _read_jsonl(results_path)
+        applied_count = 0
+        current_by_id = {str(item.get("id")): item for item in strings if item.get("id") is not None}
+        for raw_id, entry in candidates.items():
+            result = resumed.get((int(raw_id), entry["original_sha256"], model))
+            current_translation = (current_by_id.get(raw_id) or {}).get("translation") or ""
+            if (
+                result is not None
+                and current_translation == result
+                and not validate_translation(entry["original"], result, terms)
+            ):
+                entry["status"] = "applied"
+                applied_count += 1
         state = {
             "file_id": file_id,
             "file": _path_value(target_file),
-            "model": os.environ.get("OAI_MODEL") or os.environ.get("OPENAI_MODEL"),
+            "model": model,
             "candidates": candidates,
             "blocked": blocked,
-            "applied": 0,
+            "applied": applied_count,
             "conflict": 0,
             "invalid": 0,
         }
@@ -649,17 +691,18 @@ def watch_apply(args: argparse.Namespace, client: ParaTranzClient) -> None:
                     own_history = history_for_string(current_history, int(raw_id))
                     if (
                         current is None
+                        or entry["stage"] != 1
                         or current.get("original") != entry["original"]
-                        or (current.get("translation") or "") != entry["old_translation"]
                         or current.get("stage") != entry["stage"]
-                        or history_fingerprint(current_history, int(raw_id)) != entry["history_fingerprint"]
+                        or manual_translation_fingerprint(current_history, int(raw_id))
+                        != entry.get("manual_translation_fingerprint", hashlib.sha256(b"[]").hexdigest())
+                        or (
+                            (current.get("translation") or "") != entry["old_translation"]
+                            and not has_translation_import(current_history, int(raw_id))
+                        )
                     ):
                         entry["status"] = "conflict"
                         entry["reason"] = "remote_state_changed"
-                        state["conflict"] += 1
-                    elif any(item.get("field") == "translation" for item in own_history):
-                        entry["status"] = "conflict"
-                        entry["reason"] = "translation_was_edited"
                         state["conflict"] += 1
                     else:
                         safe.append((raw_id, entry, translation))
@@ -758,10 +801,15 @@ def apply_report(report_path: Path, client: ParaTranzClient) -> dict[str, int]:
         if current is not None:
             mismatch = (
                 any(_history_string_id(item) is None for item in history)
+                or row.get("stage") != 1
                 or current.get("original") != row.get("original")
-                or (current.get("translation") or "") != row.get("old_translation", "")
                 or current.get("stage") != row.get("stage")
-                or history_fingerprint(history, int(row["id"])) != row.get("history_fingerprint")
+                or manual_translation_fingerprint(history, int(row["id"]))
+                != row.get("manual_translation_fingerprint", hashlib.sha256(b"[]").hexdigest())
+                or (
+                    (current.get("translation") or "") != row.get("old_translation", "")
+                    and not has_translation_import(history, int(row["id"]))
+                )
             )
         if mismatch:
             row["status"] = "conflict"
@@ -797,6 +845,7 @@ def _parser() -> argparse.ArgumentParser:
     watch.add_argument("--run-dir", type=Path, required=True)
     watch.add_argument("--batch-size", type=int, default=20)
     watch.add_argument("--poll-interval", type=float, default=3)
+    watch.add_argument("--rebuild-state", action="store_true", help="refresh candidates while preserving verified applied results")
     return parser
 
 
