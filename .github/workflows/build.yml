@@ -256,3 +256,55 @@ jobs:
           files: |
             release_assets/*.xdelta
             release_assets/translation.zip
+
+      - name: Create Codeberg Release
+        env:
+          CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          test -n "$CODEBERG_TOKEN"
+          api="https://codeberg.org/api/v1/repos/EVA-zh-Hans/nge_2_re"
+          auth="Authorization: token $CODEBERG_TOKEN"
+
+          # The tag is mirrored by a separate workflow and may arrive later.
+          for attempt in {1..30}; do
+            status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+              --header "$auth" "$api/tags/$RELEASE_TAG")
+            if [ "$status" = 200 ]; then
+              break
+            fi
+            if [ "$status" != 404 ]; then
+              echo "Codeberg tag lookup failed (HTTP $status)" >&2
+              exit 1
+            fi
+            if [ "$attempt" = 30 ]; then
+              echo "Tag $RELEASE_TAG did not reach Codeberg" >&2
+              exit 1
+            fi
+            sleep 10
+          done
+
+          status=$(curl --silent --show-error --output release.json --write-out '%{http_code}' \
+            --header "$auth" "$api/releases/tags/$RELEASE_TAG")
+          if [ "$status" = 404 ]; then
+            jq -n --arg tag "$RELEASE_TAG" --rawfile notes release_assets/release_notes.md \
+              '{tag_name: $tag, name: $tag, body: $notes}' > release_request.json
+            curl --fail --silent --show-error --request POST \
+              --header "$auth" --header 'Content-Type: application/json' \
+              --data-binary @release_request.json "$api/releases" > release.json
+          elif [ "$status" != 200 ]; then
+            echo "Codeberg release lookup failed (HTTP $status)" >&2
+            exit 1
+          fi
+
+          release_id=$(jq -er '.id' release.json)
+          for asset in release_assets/*.xdelta release_assets/translation.zip; do
+            name=$(basename "$asset")
+            if jq -e --arg name "$name" '.assets[]? | select(.name == $name)' release.json > /dev/null; then
+              continue
+            fi
+            curl --fail --silent --show-error --request POST \
+              --header "$auth" --form "attachment=@$asset" \
+              "$api/releases/$release_id/assets?name=$name" > /dev/null
+          done
