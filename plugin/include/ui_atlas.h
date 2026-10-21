@@ -5,5 +5,6 @@
 
 // 核心：支持 UTF-8 的打印函数
 void uiPrint(float x, float y, const char* str, uint32_t color);
+int uiTextWidth(const char* str);
 
 #endif

@@ -4,7 +4,8 @@ ATTR = BIN
 OBJS = src/loader/loader.o src/loader/ui_draw.o src/loader/image_display.o\
  src/bin/atlas.o src/bin/atlas_palette.o
 
-CFLAGS = -O2 -Wall
+BUILD_YEAR := $(shell date +%Y)
+CFLAGS = -O2 -Wall -DBUILD_YEAR=$(BUILD_YEAR)
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 LDFLAGS = -nostartfiles
 
@@ -27,3 +28,6 @@ PSPSDK=$(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build.mak
 
 src/loader/ui_draw.o: include/atlas_data.h
+
+.PHONY: force-loader-year
+src/loader/loader.o: force-loader-year

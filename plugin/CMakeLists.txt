@@ -56,6 +56,8 @@ add_prx_module(EVA2RT ${RUNTIME_SOURCES} src/runtime/exports_runtime.exp)
 # Set compiler flags for C files only  
 target_compile_options(EBOOT PRIVATE -O2 -Wall)
 target_compile_options(EVA2RT PRIVATE -O2 -G0 -Wall -fno-pic)
+string(TIMESTAMP BUILD_YEAR "%Y")
+target_compile_definitions(EBOOT PRIVATE BUILD_YEAR=${BUILD_YEAR})
 
 # Set assembly flags for PSP import functions  
 set_property(SOURCE src/sceLibFont.S APPEND PROPERTY COMPILE_DEFINITIONS

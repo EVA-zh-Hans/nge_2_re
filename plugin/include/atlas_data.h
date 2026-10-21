@@ -1,12 +1,13 @@
 #ifndef __ATLAS_DATA_H__
 #define __ATLAS_DATA_H__
 
-#define ATLAS_CHAR_COUNT 174
+#define ATLAS_CHAR_COUNT 175
 
 typedef struct { unsigned short code; unsigned char width; } CharIndex;
 
 static const CharIndex atlas_index[] = {
     { 0x0020, 4 },
+    { 0x002D, 6 },
     { 0x002E, 3 },
     { 0x002F, 6 },
     { 0x0030, 9 },

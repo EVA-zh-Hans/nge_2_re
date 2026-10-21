@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-#include <stdio.h>
 #include <pspkernel.h>
 #include <pspthreadman.h>
 #include <pspmodulemgr.h>
@@ -95,6 +94,11 @@ void drawRect(float x, float y, float w, float h) {
 #define PathOldBoot "disc0:/PSP_GAME/SYSDIR/BOOT.BIN"
 #define PathRuntime "disc0:/PSP_GAME/SYSDIR/EVA2RT.PRX"
 #define MENU_ITEM_COUNT 4
+#define MENU_ROW_GAP 24
+#define MENU_FIRST_Y 90
+#define STRINGIFY_VALUE(value) #value
+#define STRINGIFY(value) STRINGIFY_VALUE(value)
+#define PROJECT_CREDIT "EVA2 汉化计划 2024-" STRINGIFY(BUILD_YEAR)
 
 int selected_index = 0;
 int last_pad_buttons = 0;
@@ -105,6 +109,10 @@ static int enable_pulse_autowin = 0;
 static int enable_daily_debug = 0;
 static int enable_battle_debug = 0;
 static int enable_60_fps = 0;
+
+static void printCentered(int y, const char* text, uint32_t color) {
+    uiPrint((SCREEN_WIDTH - uiTextWidth(text)) / 2, y, text, color);
+}
 
 void handleInput() {
     sceCtrlPeekBufferPositive(&pad, 1);
@@ -133,7 +141,17 @@ void handleInput() {
 
 static int main_thread(SceSize args, void *argp)
 {
-
+	const char* labels[MENU_ITEM_COUNT] = {
+		"自动跳过脉冲", "启用战斗调试菜单", "启用日常调试菜单", "60FPS"
+	};
+	int label_width = 0;
+	int i;
+	for (i = 0; i < MENU_ITEM_COUNT; i++) {
+		int width = uiTextWidth(labels[i]);
+		if (width > label_width) label_width = width;
+	}
+	int menu_x = (SCREEN_WIDTH - label_width - 24 - uiTextWidth("[OFF]")) / 2;
+	int toggle_x = menu_x + label_width + 24;
 	initGu();
 	
 	while(1) {	
@@ -144,24 +162,19 @@ static int main_thread(SceSize args, void *argp)
             // TODO: Draw Logo
             // drawRect(100.0f, 100.0f, 280.0f, 72.0f);
 
-            // Render Menu
-            uint32_t color = (selected_index == 0) ? 0xFF00FFFF : 0xFFFFFFFF;
-            uiPrint(110, 110, "自动跳过脉冲", color);
-            uiPrint(250, 110, enable_pulse_autowin ? "[ON]" : "[OFF]", color);
-            
-            uiPrint(110, 135, "启用战斗调试菜单", (selected_index == 1) ? 0xFF00FFFF : 0xFFFFFFFF);
-            uiPrint(250, 135, enable_battle_debug ? "[ON]" : "[OFF]", (selected_index == 1) ? 0xFF00FFFF : 0xFFFFFFFF);
+            const int enabled[MENU_ITEM_COUNT] = {
+                enable_pulse_autowin, enable_battle_debug, enable_daily_debug, enable_60_fps
+            };
+            for (i = 0; i < MENU_ITEM_COUNT; i++) {
+                uint32_t color = (selected_index == i) ? 0xFF00FFFF : 0xFFFFFFFF;
+                int y = MENU_FIRST_Y + i * MENU_ROW_GAP;
+                uiPrint(menu_x, y, labels[i], color);
+                uiPrint(toggle_x, y, enabled[i] ? "[ON]" : "[OFF]", color);
+            }
 
-            uiPrint(110, 160, "启用日常调试菜单", (selected_index == 2) ? 0xFF00FFFF : 0xFFFFFFFF);
-            uiPrint(250, 160, enable_daily_debug ? "[ON]" : "[OFF]", (selected_index == 2) ? 0xFF00FFFF : 0xFFFFFFFF);
-
-            uiPrint(110, 185, "60FPS", (selected_index == 3) ? 0xFF00FFFF : 0xFFFFFFFF);
-            uiPrint(250, 185, enable_60_fps ? "[ON]" : "[OFF]", (selected_index == 3) ? 0xFF00FFFF : 0xFFFFFFFF);
-            
-            uiPrint(150, 210, "按 START 键启动游戏", 0xFF00AAFF);
-
-            uiPrint(150, 230, "EVA2 汉化计划 2026", 0xFF00AAFF);
-            uiPrint(150, 245, "插件制作：main_void", 0xFF00AAFF);
+            printCentered(210, "按 START 键启动游戏", 0xFF00AAFF);
+            printCentered(230, PROJECT_CREDIT, 0xFF00AAFF);
+            printCentered(245, "插件制作：main_void", 0xFF00AAFF);
         }
 		endFrame();
 

@@ -32,6 +32,18 @@ static int get_char_info(uint32_t code, int* width) {
     return -1;
 }
 
+int uiTextWidth(const char* str) {
+    const char* p = str;
+    int width = 0;
+    while (*p) {
+        int char_w = 0;
+        if (get_char_info(next_utf8_char(&p), &char_w) >= 0) {
+            width += char_w + 1;
+        }
+    }
+    return width;
+}
+
 void uiPrint(float x, float y, const char* str, uint32_t color) {
     sceGuEnable(GU_TEXTURE_2D);
     sceGuTexMode(GU_PSM_T8, 0, 0, 0);  // 使用 8 位索引格式
