@@ -15,13 +15,9 @@ import sys
 import argparse
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Any, Optional, TYPE_CHECKING
+from typing import Dict, Any, Optional
 
 import requests
-
-if TYPE_CHECKING:
-    from PIL import Image as PILImage
-
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_HAN_SANS_SC = ROOT / "resources" / "assets" / "font" / "SourceHanSansSC-Medium.otf"
@@ -124,45 +120,42 @@ def get_paratranz_stats(
 
         # Get artifact info (latest build)
         artifacts_url = f"https://paratranz.cn/api/projects/{project_id}/artifacts"
-        artifacts_response = requests.get(artifacts_url, headers=headers, timeout=10)
-        artifacts_response.raise_for_status()
-        artifacts_data = artifacts_response.json()
+        try:
+            artifacts_response = requests.get(artifacts_url, headers=headers, timeout=10)
+            artifacts_response.raise_for_status()
+            artifacts_data = artifacts_response.json()
+        except requests.RequestException as e:
+            print(f"Warning: Failed to get ParaTranz artifacts: {e}")
+            artifacts_data = []
 
-        # Combine data - artifacts API returns a single object or a list
-        stats = {}
-        latest_artifact = None
-        
+        project_stats = project_data.get("stats") or {}
         if isinstance(artifacts_data, dict):
-            # If it's a dict, use it directly
-            latest_artifact = artifacts_data
-        elif isinstance(artifacts_data, list) and len(artifacts_data) > 0:
-            # If it's a list, get the first item
-            latest_artifact = artifacts_data[0]
-        
-        if latest_artifact:
-            stats = {
-                "id": latest_artifact.get("id"),
-                "createdAt": latest_artifact.get("createdAt"),
-                "project": project_id,
-                "total": latest_artifact.get("total", 0),
-                "translated": latest_artifact.get("translated", 0),
-                "disputed": latest_artifact.get("disputed", 0),
-                "checked": latest_artifact.get("checked", 0),
-                "reviewed": latest_artifact.get("reviewed", 0),
-                "hidden": latest_artifact.get("hidden", 0),
-                "size": latest_artifact.get("size", 0),
-                "duration": latest_artifact.get("duration", 0),
-            }
+            artifacts = artifacts_data.get("data", artifacts_data.get("items", []))
+            if isinstance(artifacts, dict):
+                artifacts = [artifacts]
+            elif not isinstance(artifacts, list):
+                artifacts = []
+            if not artifacts and artifacts_data.get("createdAt"):
+                artifacts = [artifacts_data]
+        elif isinstance(artifacts_data, list):
+            artifacts = artifacts_data
         else:
-            # Fallback to project data
-            stats = {
-                "project": project_id,
-                "name": project_data.get("name", ""),
-                "total": project_data.get("total", 0),
-                "translated": project_data.get("translated", 0),
-                "disputed": project_data.get("disputed", 0),
-                "reviewed": project_data.get("reviewed", 0),
-            }
+            artifacts = []
+        latest_artifact = next((item for item in artifacts if isinstance(item, dict)), {})
+
+        stats = {
+            "id": latest_artifact.get("id"),
+            "createdAt": latest_artifact.get("createdAt") or project_stats.get("modifiedAt"),
+            "project": project_id,
+            "total": project_stats.get("total", 0),
+            "translated": project_stats.get("translated", 0),
+            "disputed": project_stats.get("disputed", 0),
+            "checked": project_stats.get("checked", 0),
+            "reviewed": project_stats.get("reviewed", 0),
+            "hidden": project_stats.get("hidden", 0),
+            "size": latest_artifact.get("size", 0),
+            "duration": latest_artifact.get("duration", 0),
+        }
 
         return stats
     except Exception as e:
@@ -448,11 +441,9 @@ def generate_metadata_pic0(metadata: Dict[str, Any], output_path: str):
         if font_large is None:
             raise OSError("No truetype fonts found")
             
-        font_medium = ImageFont.truetype(font_large.path, 11)
         font_small = ImageFont.truetype(font_large.path, 10)
     except (OSError, IOError):
         font_large = ImageFont.load_default()
-        font_medium = ImageFont.load_default()
         font_small = ImageFont.load_default()
 
     # First pass: collect all text lines
@@ -488,7 +479,7 @@ def generate_metadata_pic0(metadata: Dict[str, Any], output_path: str):
 
     # Translation data creation time (convert from UTC to China timezone UTC+8)
     time_str = "unknown"
-    if metadata.get("translation") and "createdAt" in metadata["translation"]:
+    if metadata.get("translation") and metadata["translation"].get("createdAt"):
         try:
             dt = datetime.fromisoformat(metadata["translation"]["createdAt"].replace("Z", "+00:00"))
             # Convert to China timezone (UTC+8)
@@ -515,7 +506,6 @@ def generate_metadata_pic0(metadata: Dict[str, Any], output_path: str):
 
     # Add padding
     padding = 10
-    box_width = width - padding * 2  # Use full width
     box_height = total_text_height + padding * 2
 
     # Position at top-left to fill the image
