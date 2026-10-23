@@ -1,1 +1,1 @@
-"""Database-free resource transformation pipeline."""
+"""On-demand resource transformation pipeline."""

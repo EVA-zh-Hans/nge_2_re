@@ -64,13 +64,6 @@ settings.json
 /text_out/
 /translation_export/
 
-# Local databases and SQLite sidecars
-*.db
-*.db-journal
-*.db-shm
-*.db-wal
-*.db-x-*
-
 # Patch and disc artifacts
 *.iso
 *.xdelta

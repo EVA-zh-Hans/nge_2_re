@@ -18,12 +18,8 @@ TOOLS_DIR       := $(BUILD_DIR)/tools
 PSP_GAME_DIR    := $(TEMP_DIR)/ULJS00064/PSP_GAME
 USRDIR          := $(PSP_GAME_DIR)/USRDIR
 
-# HGAR Directories List (Used for loop)
-HGAR_DIRS       := btdemo btface btl chara event face free game im map
-
 # Tool Commands
 UV_RUN          := uv run
-PYTHON_MAIN     := $(UV_RUN) -m app.cli.main
 
 # ==========================================
 # Default Target: Help
@@ -32,50 +28,18 @@ PYTHON_MAIN     := $(UV_RUN) -m app.cli.main
 
 help:
 	@echo "Available commands:"
-	@echo "  make init_db             - Initialize the database"
-	@echo "  make import_all          - Import all assets (hgar, text, bind)"
 	@echo "  make download_trans      - Download translations, terminology, and run checks"
 	@echo "  make generate_memtalk_templates - Generate Runtime MemTalk C templates"
 	@echo "  make generate_staff_roll - Generate translated Staff Roll assets"
 	@echo "  make preview_staff_roll  - Generate and open the Staff Roll PNG preview"
-	@echo "  make inject_staff_roll   - Inject staff21.hpt into exported staff.har"
-	@echo "  make import_trans        - Import downloaded translations to DB"
-	@echo "  make export_all          - Export all game files (text, hgar, eboot)"
-	@echo "  make stream_export       - Export translated resources without SQLite"
+	@echo "  make inject_staff_roll   - Deprecated; requires exported game/staff.har"
+	@echo "  make export_resources    - Build translated resources on demand"
+	@echo "  make export_eboot_trans  - Generate the EBOOT translation binary"
 	@echo "  make gen_metadata        - Generate patch metadata (JSON and image)"
 	@echo "  make patch_iso           - Create the patched ISO and xdelta"
 	@echo "  make patch_all_ids       - Generate patches for all GAME_IDS (00061 & 00064)"
 	@echo "  make full_build          - Run the complete pipeline"
-	@echo "  make stream_full_build   - Build patches with the streaming resource path"
 	@echo "  make clean               - Clean build artifacts"
-
-# ==========================================
-# Database & Import Tasks
-# ==========================================
-
-init_db:
-	@echo "Initializing database..."
-	$(PYTHON_MAIN) --init_db
-
-# Combined Import HGAR Target using Loop
-import_hgar:
-	@echo "Importing HGAR archives..."
-	@for dir in $(HGAR_DIRS); do \
-		echo "  -> Importing $$dir..."; \
-		$(PYTHON_MAIN) --import_har "$(USRDIR)/$$dir"; \
-	done
-
-import_text:
-	@echo "Importing text entries..."
-	$(PYTHON_MAIN) --import_text '$(USRDIR)/free/f2info.bin'
-	$(PYTHON_MAIN) --import_text '$(USRDIR)/free/f2tuto.bin'
-
-import_bind:
-	@echo "Importing binding entries..."
-	$(PYTHON_MAIN) --import_bind '$(USRDIR)/btl/btimtext.bin'
-	$(PYTHON_MAIN) --import_bind '$(USRDIR)/game/imtext.bin'
-
-import_all: import_hgar import_text import_bind
 
 # ==========================================
 # Translation Management
@@ -101,36 +65,9 @@ check_trans:
 		--terms-file '$(DOWNLOAD_DIR)/terms-10882.json' \
 		--report '$(BUILD_DIR)/translation_report.json'
 
-import_trans: generate_memtalk_templates
-	@echo "Importing translations..."
-	$(PYTHON_MAIN) --import_translation '$(DOWNLOAD_DIR)/evs_trans.json'
-	$(PYTHON_MAIN) --import_cev_translation '$(DOWNLOAD_DIR)/utf8/EVS/cev'
-	$(PYTHON_MAIN) --import_translation '$(DOWNLOAD_DIR)/utf8/free/info.json'
-	$(PYTHON_MAIN) --import_translation '$(DOWNLOAD_DIR)/utf8/free/tuto.json'
-	$(PYTHON_MAIN) --import_translation '$(DOWNLOAD_DIR)/utf8/game/btimtext.json'
-	$(PYTHON_MAIN) --import_translation '$(DOWNLOAD_DIR)/utf8/game/imtext.json'
-
-import_images:
-	@echo "Importing images..."
-	$(PYTHON_MAIN) --import_images 'resources/trans_pic/trans'
-
 # ==========================================
 # Export Tasks
 # ==========================================
-
-export_text:
-	@echo "Exporting text entries..."
-	$(PYTHON_MAIN) --export_text $(EXPORT_USRDIR)/free --text_filename f2info.bin
-	$(PYTHON_MAIN) --export_text $(EXPORT_USRDIR)/free --text_filename f2tuto.bin
-
-export_bind:
-	@echo "Exporting binding entries..."
-	$(PYTHON_MAIN) --export_bind $(EXPORT_USRDIR)/btl --bind_filename btimtext.bin
-	$(PYTHON_MAIN) --export_bind $(EXPORT_USRDIR)/game --bind_filename imtext.bin
-
-export_hgar:
-	@echo "Generating hgar..."
-	$(PYTHON_MAIN) --output_hgar $(EXPORT_USRDIR)
 
 generate_staff_roll:
 	@echo "Generating translated Staff Roll..."
@@ -146,8 +83,10 @@ preview_staff_roll: generate_staff_roll
 		echo "Preview: $(BUILD_DIR)/generated/staff_roll/staff_roll.png"; \
 	fi
 
-inject_staff_roll: export_hgar generate_staff_roll
-	@echo "Injecting translated Staff Roll..."
+# Deprecated: this only reinjects the staff roll into an existing exported
+# game/staff.har. Run export_resources first to create that archive.
+inject_staff_roll: generate_staff_roll
+	@echo "Warning: inject_staff_roll is deprecated and requires an existing exported game/staff.har."
 	$(UV_RUN) scripts/staff/generate_staff_roll.py \
 		--inject-har $(EXPORT_USRDIR)/game/staff.har
 
@@ -156,10 +95,8 @@ export_eboot_trans:
 	@mkdir -p $(EXPORT_BIN_DIR)
 	$(UV_RUN) -m app.elf_patch.patcher -t $(DOWNLOAD_DIR)/eboot_trans.json -o $(EXPORT_BIN_DIR)/EBTRANS.BIN
 
-export_all: export_text export_bind inject_staff_roll export_eboot_trans
-
-stream_export:
-	@echo "Streaming translated resources without SQLite..."
+export_resources:
+	@echo "Building translated resources on demand..."
 	$(UV_RUN) -m app.pipeline.stream_build \
 		--source $(USRDIR) \
 		--output $(EXPORT_USRDIR) \
@@ -237,24 +174,10 @@ patch_iso: repack_iso gen_xdelta
 # ==========================================
 
 # Full Build Pipeline
-# Note: We keep strictly ordered steps here to avoid DB locking issues
 full_build:
 	$(MAKE) extract_iso
-	$(MAKE) init_db
-	$(MAKE) import_all
-	$(MAKE) import_images
-	$(MAKE) import_trans
-	$(MAKE) export_all
-	$(MAKE) plugin
-	$(MAKE) decrypt_eboot
-	$(MAKE) copy_font
-	$(MAKE) gen_metadata
-	$(MAKE) patch_all_ids
-
-stream_full_build:
-	$(MAKE) extract_iso
 	$(MAKE) generate_memtalk_templates
-	$(MAKE) stream_export
+	$(MAKE) export_resources
 	$(MAKE) export_eboot_trans
 	$(MAKE) plugin
 	$(MAKE) decrypt_eboot
@@ -264,9 +187,9 @@ stream_full_build:
 
 rebuild:
 	$(MAKE) download_trans
-	$(MAKE) import_trans
-	$(MAKE) import_images
-	$(MAKE) export_all
+	$(MAKE) generate_memtalk_templates
+	$(MAKE) export_resources
+	$(MAKE) export_eboot_trans
 	$(MAKE) plugin
 	$(MAKE) decrypt_eboot
 	$(MAKE) copy_font
@@ -286,13 +209,12 @@ clean:
 	# Optional: Clean plugin and tools
 	# $(MAKE) -C plugin clean
 
-.PHONY: generate_staff_roll preview_staff_roll inject_staff_roll stream_export
+.PHONY: generate_staff_roll preview_staff_roll inject_staff_roll export_resources
 	# $(MAKE) -C third_party/pspdecrypt clean
 
 # Mark targets as PHONY (not real files)
-.PHONY: help init_db import_hgar import_text import_bind import_images import_all \
-        download_trans generate_memtalk_templates check_trans import_trans \
-        export_text export_bind export_hgar export_eboot_trans export_all \
+.PHONY: help download_trans generate_memtalk_templates check_trans \
+        export_resources export_eboot_trans \
         plugin pgftool pspdecrypt \
         extract_iso decrypt_eboot copy_font repack_iso gen_xdelta gen_metadata patch_iso \
-        full_build stream_full_build rebuild patch_all_ids patch_id_% clean
+        full_build rebuild patch_all_ids patch_id_% clean
