@@ -1,0 +1,480 @@
+---
+import Layout from '../layouts/Layout.astro';
+import historyData from '../data/history.json';
+const updatedAt = new Date(historyData.fetchedAt).toLocaleString('zh-CN', {
+  timeZone: 'Asia/Shanghai', hour12: false,
+});
+---
+<Layout title="译文星图 · EVA2 汉化计划">
+  <main id="translation-history">
+    <header class="intro">
+      <div>
+        <a href={import.meta.env.BASE_URL}>EVA2 / TRANSLATION ARCHIVE</a>
+        <h1>谁让这个世界，有了<span>中文。</span></h1>
+        <p>沿着真实的时间，重访每一位贡献者留下的轨迹。</p>
+      </div>
+      <div class="edition">
+        <span>PARATRANZ / PROJECT 10882</span>
+        <strong>{historyData.count.toLocaleString()} 次操作 · {historyData.users.length} 位贡献者</strong>
+        <span>2024 — 2026</span>
+      </div>
+    </header>
+
+    <section id="history-player" aria-label="译文星图播放器">
+      <header class="player-toolbar">
+        <div class="player-title"><span class="signal" aria-hidden="true"></span><strong>译文星图</strong><span>TRANSLATION ATLAS</span></div>
+        <div class="view-actions"><span id="view-mode" role="status">真实历史回放</span><button id="fullscreen" type="button" aria-pressed="false" aria-controls="history-player">⛶ 全屏观看</button></div>
+      </header>
+
+      <section class="observatory" aria-label="真实翻译历史">
+        <div class="stage">
+          <div class="map-head">
+            <div><span class="eyebrow" id="play-state">已暂停</span><h2 id="date"></h2><span class="window-label">此前 14 天 · 每人最多 16 条轨迹</span></div>
+            <div class="legend"><span>● 翻译</span><span>◆ 修改</span><span>○ 校对 / 其他</span></div>
+          </div>
+          <canvas id="atlas" role="img" aria-label="实名贡献者连接到他们实际操作的词条，线条与贡献者同色；形状区分操作。"></canvas>
+          <div id="contributors" aria-label="近期活跃贡献者"></div>
+          <div class="map-caption"><span>01 / 贡献者 → 词条</span><span id="node-note"></span></div>
+        </div>
+        <aside>
+          <div class="summary">
+            <div class="section-label" id="stat-label">截至当前 · 全部贡献者</div>
+            <div class="metrics">
+              <div class="metric"><strong id="total">0</strong><span>次操作</span></div>
+              <div class="small-stats"><div><strong id="people">0</strong><span>位参与者</span></div><div><strong id="strings">0</strong><span>个词条</span></div></div>
+            </div>
+          </div>
+          <div class="section-label activity-label">02 / 贡献者 <span>点击追踪</span></div>
+          <div class="filter-actions"><button id="clear-filter" type="button" hidden>所有人 ×</button><button id="last-contribution" type="button" hidden>最近贡献 ↗</button></div>
+          <div id="ranking" aria-label="贡献者操作次数"></div>
+          <p class="aside-note">按累计历史操作计数，包含修订与阶段变更。</p>
+        </aside>
+      </section>
+
+      <section class="stories" aria-label="最近改动">
+        <div class="story-heading"><h3>03 / 实际改动</h3><span id="feed-scope">所选日期之前的最近操作</span></div>
+        <div id="feed" aria-live="off"></div>
+      </section>
+
+      <section class="transport" aria-label="播放控制">
+        <div class="buttons">
+          <button id="play" type="button">播放历史</button><button id="restart" type="button">↺ 从头开始</button><button id="peak" type="button">协作高峰</button>
+          <label>速度 <select id="speed" aria-label="播放速度"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
+          <span id="elapsed"></span>
+          <label class="seek-label" for="seek">日期 <span id="seek-date"></span></label>
+        </div>
+        <div class="timeline">
+          <div class="activity" id="activity" aria-label="每月真实操作量"></div>
+          <input id="seek" aria-label="历史日期" type="range" min="0" max="10000" value="0" step="1" />
+          <div class="years"><button data-year="2024" type="button">2024</button><button data-year="2025" type="button">2025</button><button data-year="2026" type="button">2026</button></div>
+        </div>
+        <div class="timeline-note"><span>月度操作量 · 随贡献者筛选</span><span id="range-end"></span></div>
+      </section>
+      <footer class="player-footer"><span>ParaTranz 公开历史 · {historyData.count.toLocaleString()} 条记录</span><span>更新 {updatedAt} / 上海</span></footer>
+    </section>
+    <footer class="closing">
+      <p>仅回放公开历史中可见的操作，不推算翻译完成率。星图展示最多 6 位近期活跃贡献者和 240 个词条节点；统计包含快照中的全部记录。文本预览最多 240 字符，阶段变更以原始值展示。</p>
+      <a href="https://paratranz.cn/projects/10882" target="_blank" rel="noreferrer">前往 ParaTranz 项目 ↗</a>
+    </footer>
+  </main>
+</Layout>
+<script is:inline define:vars={{historyData}}>
+(()=>{
+const root=document.getElementById('translation-history'),$=id=>root.querySelector('#'+id);
+const canvas=$('atlas'),ctx=canvas.getContext('2d'),events=historyData.events;
+const users=new Map(historyData.users.map((u,i)=>[u.id,{...u,color:['#b32d3a','#287c87','#7055a6','#a06a21','#865b70','#3e6f9b','#55734b'][i%7]}]));
+const start=events[0][1],end=events.at(-1)[1],span=end-start,day=86400000;
+const date=ms=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(ms).replaceAll('-','.');
+const moment=ms=>new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(ms);
+const rankRows=new Map();let contributorKey='';
+const labels={translate:'翻译',edit:'修改',review:'校对',rollback:'回退',dispute:'标记疑问',reset:'重置',lock:'锁定'};
+const op=e=>labels[e[4]]||(e[5]==='translation'?'更新译文':'变更 '+(e[5]||'词条'));
+let peak=0,left=0,largest=0;for(let right=0;right<events.length;right++){while(events[left][1]<events[right][1]-14*day)left++;if(right-left+1>largest){largest=right-left+1;peak=events[right][1]}}
+let now=peak,t=(peak-start)/span,playing=false,speed=1,last=0,lastSync=0,selected=null,index=events.length,visible=[],recent=[],lines=[],active=[],w=800,h=540,anchors=[],nodePositions=new Map(),lastKey='',plot={cx:400,cy:270,rx:250,ry:150};
+const months=[];const first=new Date(start+8*3600000);let year=first.getUTCFullYear(),month=first.getUTCMonth();while(Date.UTC(year,month,1)-8*3600000<=end){months.push({time:Date.UTC(year,month,1)-8*3600000,count:0});month++;if(month===12){year++;month=0}}
+function make(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
+function avatar(u){const image=make('img','avatar');image.src=u.avatar;image.alt='';image.loading='lazy';image.referrerPolicy='no-referrer';image.onerror=()=>{image.hidden=true};return image}
+function filter(id){selected=selected===id?null:id;lastKey='';sync();draw()}
+function updateMonths(){for(const m of months)m.count=0;for(const e of events){if(selected!==null&&e[2]!==selected)continue;const d=new Date(e[1]+8*3600000);const i=(d.getUTCFullYear()-first.getUTCFullYear())*12+d.getUTCMonth()-first.getUTCMonth();if(months[i])months[i].count++}const max=Math.max(1,...months.map(m=>m.count));$('activity').replaceChildren();for(const m of months){const bar=make('button','bar');bar.type='button';bar.style.height=Math.max(3,m.count/max*100)+'%';bar.setAttribute('aria-label',date(m.time).slice(0,7)+'：'+m.count+' 次操作，跳到该月');bar.title=bar.getAttribute('aria-label');bar.onclick=()=>{t=Math.max(0,Math.min(1,(m.time-start)/span));sync();draw()};$('activity').append(bar)}}
+function sync(){now=start+t*span;let lo=0,hi=events.length;while(lo<hi){const mid=(lo+hi)>>>1;if(events[mid][1]<=now)lo=mid+1;else hi=mid}index=lo;
+$('date').textContent=date(now);$('seek-date').textContent=date(now);$('seek').value=Math.round(t*10000);$('elapsed').textContent=index.toLocaleString()+' / '+events.length.toLocaleString()+' 条记录';$('play').textContent=playing?'暂停':t>=1?'从头播放':'继续播放';$('play-state').textContent=playing?'正在回放':Math.abs(now-peak)<1?'协作高峰 · 14 天内 '+largest.toLocaleString()+' 次操作':'时间已定格';$('range-end').textContent=date(end);
+const key=index+':'+selected;if(key===lastKey)return;const filterChanged=lastKey.split(':')[1]!==String(selected);lastKey=key;
+const all=events.slice(0,index),counts=new Map();for(const e of all)counts.set(e[2],(counts.get(e[2])||0)+1);
+visible=selected===null?all:all.filter(e=>e[2]===selected);recent=visible.filter(e=>e[1]>=now-14*day);
+$('stat-label').textContent='截至当前 · '+(selected===null?'全部贡献者':users.get(selected).name);$('total').textContent=visible.length.toLocaleString();$('people').textContent=new Set(visible.map(e=>e[2])).size;$('strings').textContent=new Set(visible.filter(e=>e[3]).map(e=>e[3])).size;
+$('clear-filter').hidden=selected===null;$('last-contribution').hidden=selected===null;const ranked=[...users].sort((a,b)=>(counts.get(b[0])||0)-(counts.get(a[0])||0));ranked.forEach(([uid,u],position)=>{let row=rankRows.get(uid);if(!row){row=make('button','rank');row.type='button';row.style.setProperty('--person-color',u.color);row.append(avatar(u),make('span','person-name',u.name),make('strong'));row.onclick=()=>filter(uid);rankRows.set(uid,row)}row.classList.toggle('selected',uid===selected);row.setAttribute('aria-pressed',String(uid===selected));row.lastChild.textContent=(counts.get(uid)||0).toLocaleString();const current=$('ranking').children[position];if(current!==row)$('ranking').insertBefore(row,current||null)});
+
+const recentCounts=new Map();for(const e of recent)recentCounts.set(e[2],(recentCounts.get(e[2])||0)+1);active=[...recentCounts].sort((a,b)=>b[1]-a[1]).slice(0,6).map(([id])=>id);
+if(!active.length){active=[...counts].filter(([id])=>selected===null||id===selected).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([id])=>id)}
+lines=active.flatMap(uid=>recent.filter(e=>e[2]===uid).slice(-16));
+const nextContributors=active.join(':');if(nextContributors!==contributorKey){contributorKey=nextContributors;$('contributors').replaceChildren();for(const uid of active){const u=users.get(uid),card=make('button','contributor');card.type='button';card.style.setProperty('--person-color',u.color);card.append(avatar(u),make('span','',u.name),make('small'));card.setAttribute('aria-label','追踪 '+u.name);card.onclick=()=>filter(uid);$('contributors').append(card)}}[...$('contributors').children].forEach((card,i)=>{const uid=active[i];card.lastChild.textContent=recentCounts.has(uid)?'14 天内 '+recentCounts.get(uid)+' 次':'近期无操作'});
+
+$('feed').replaceChildren();for(const e of visible.slice(-3).reverse()){const u=users.get(e[2]);const card=make('article','event');const head=make('div','event-head');head.append(avatar(u),make('b','',u.name),make('span','',op(e)));card.append(head,make('small','',date(e[1])+' '+moment(e[1]).split(' ').at(-1)+' · 词条 #'+(e[3]||'已移除')+' · 操作 #'+e[0]));if(e[5]==='translation'){if(e[6])card.append(make('div','before','− '+e[6].replaceAll('\\n',' ↵ ')));card.append(make('div','after','+ '+(e[7]||'（清空译文）').replaceAll('\\n',' ↵ ')))}else{card.append(make('div','stage-change',(e[5]==='stage'?'阶段':'字段 '+e[5])+'：'+(e[6]||'空')+' → '+(e[7]||'空')));if(e[8])card.append(make('div','original',e[8].replaceAll('\\n',' ↵ ')))}$('feed').append(card)}if(!visible.length)$('feed').append(make('p','','该日期之前没有此贡献者的操作记录。'));
+$('feed-scope').textContent=(selected===null?'所有人':users.get(selected).name)+' · 最近三次操作';
+if(filterChanged)updateMonths();[...$('activity').children].forEach((b,i)=>b.classList.toggle('past',months[i].time<=now));layout();}
+function layout() {
+  const compact = $('history-player').classList.contains('is-immersive');
+  const narrow = w < 500;
+  const top = compact ? (narrow ? 74 : 86) : 116;
+  const bottom = compact ? 28 : 38;
+  const available = Math.max(60, h - top - bottom);
+  plot = { cx: w / 2, cy: top + available / 2, rx: Math.max(40, (w - (narrow ? 112 : 164)) / 2), ry: available * .35 };
+  anchors = active.map((uid, i) => {
+    const angle = i / Math.max(3, active.length) * Math.PI * 2 - Math.PI / 2;
+    return { uid, x: plot.cx + Math.cos(angle) * plot.rx, y: plot.cy + Math.sin(angle) * plot.ry };
+  });
+  [...$('contributors').children].forEach((card, i) => {
+    card.style.left = anchors[i].x + 'px';
+    card.style.top = anchors[i].y + 'px';
+  });
+  nodePositions = new Map();
+  const targets = [...new Set([...lines.slice().reverse(), ...visible.slice().reverse()].map(e => e[3] || -e[0]))].slice(0, 240);
+  for (const id of targets) {
+    const angle = ((Math.abs(id) * .61803398875) % 1) * Math.PI * 2;
+    const radius = Math.sqrt((Math.abs(id) * .41421356237) % 1);
+    nodePositions.set(id, { x: plot.cx + Math.cos(angle) * w * .23 * radius, y: plot.cy + Math.sin(angle) * available * .28 * radius });
+  }
+  $('node-note').textContent = targets.length + ' 个近期词条';
+}
+function draw() {
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = '#dedbd7';
+  ctx.lineWidth = .65;
+  for (let radius = 45; radius < Math.min(w * .32, plot.ry * 1.6); radius += 45) {
+    ctx.beginPath(); ctx.ellipse(plot.cx, plot.cy, radius, radius * .7, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+  for (const point of nodePositions.values()) {
+    ctx.fillStyle = '#777b78'; ctx.globalAlpha = .55;
+    ctx.beginPath(); ctx.arc(point.x, point.y, 1.6, 0, 7); ctx.fill();
+  }
+  for (const event of lines) {
+    const anchor = anchors.find(a => a.uid === event[2]), point = nodePositions.get(event[3] || -event[0]);
+    if (!anchor || !point) continue;
+    const age = (now - event[1]) / (14 * day), user = users.get(event[2]);
+    ctx.strokeStyle = user.color; ctx.globalAlpha = .18 + .48 * (1 - age);
+    ctx.beginPath(); ctx.moveTo(anchor.x, anchor.y); ctx.quadraticCurveTo(plot.cx, plot.cy, point.x, point.y); ctx.stroke();
+    const progress = Math.min(1, (now - event[1]) / (4 * day));
+    const x = (1 - progress) ** 2 * anchor.x + 2 * (1 - progress) * progress * plot.cx + progress ** 2 * point.x;
+    const y = (1 - progress) ** 2 * anchor.y + 2 * (1 - progress) * progress * plot.cy + progress ** 2 * point.y;
+    ctx.fillStyle = user.color; ctx.beginPath();
+    if (event[4] === 'edit') {
+      ctx.moveTo(x, y - 3); ctx.lineTo(x + 3, y); ctx.lineTo(x, y + 3); ctx.lineTo(x - 3, y); ctx.closePath(); ctx.fill();
+    } else { ctx.arc(x, y, 2.7, 0, 7); event[4] === 'translate' ? ctx.fill() : ctx.stroke(); }
+  }
+  ctx.globalAlpha = 1;
+  if (!recent.length) {
+    ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#77716e';
+    ctx.fillText('这 14 天没有可见操作', plot.cx, plot.cy);
+  }
+}
+function resize(){const rect=canvas.getBoundingClientRect();w=rect.width;h=rect.height;const d=Math.min(devicePixelRatio||1,2);canvas.width=w*d;canvas.height=h*d;ctx.setTransform(d,0,0,d,0,0);layout();draw()}new ResizeObserver(resize).observe(canvas);
+// Native fullscreen and the embedded-browser fallback share one layout.
+const player = $('history-player');
+let immersive = false;
+let nativeActive = false;
+let previousOverflow = '';
+let previousScroll = 0;
+let inertSiblings = [];
+function setImmersive(enabled) {
+  if (immersive === enabled) return;
+  immersive = enabled;
+  player.classList.toggle('is-immersive', enabled);
+  $('fullscreen').setAttribute('aria-pressed', String(enabled));
+  $('fullscreen').textContent = enabled ? '↙ 退出全屏' : '⛶ 全屏观看';
+  $('view-mode').textContent = enabled ? '全屏观看 · Esc 退出' : '真实历史回放';
+  if (enabled) {
+    previousOverflow = document.body.style.overflow;
+    previousScroll = window.scrollY;
+    document.body.style.overflow = 'hidden';
+    for (let branch = player; branch.parentElement && branch !== document.body; branch = branch.parentElement) {
+      for (const sibling of branch.parentElement.children) {
+        if (sibling !== branch && sibling instanceof HTMLElement) {
+          inertSiblings.push([sibling, sibling.inert]);
+          sibling.inert = true;
+        }
+      }
+    }
+  } else {
+    document.body.style.overflow = previousOverflow;
+    for (const [element, wasInert] of inertSiblings) element.inert = wasInert;
+    inertSiblings = [];
+    window.scrollTo({ top: previousScroll, behavior: 'instant' });
+  }
+  $('fullscreen').focus({ preventScroll: true });
+  requestAnimationFrame(resize);
+}
+async function leaveFullscreen() {
+  if (document.fullscreenElement === player) {
+    try { await document.exitFullscreen(); } catch { /* Keep the window fallback usable. */ }
+  }
+  setImmersive(false);
+}
+$('fullscreen').onclick = async () => {
+  if (immersive) { await leaveFullscreen(); return; }
+  setImmersive(true);
+  try {
+    if (!player.requestFullscreen || !document.fullscreenEnabled) throw new Error('Window fullscreen');
+    await player.requestFullscreen({ navigationUI: 'hide' });
+  } catch {
+    if (immersive) $('view-mode').textContent = '窗口全屏 · Esc 退出';
+  }
+};
+document.addEventListener('fullscreenchange', () => {
+  if (document.fullscreenElement === player) {
+    nativeActive = true;
+  } else if (nativeActive) {
+    nativeActive = false;
+    setImmersive(false);
+  }
+});
+document.addEventListener('keydown', event => {
+  if (!immersive) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    leaveFullscreen();
+  } else if (event.key === 'Tab') {
+    const controls = [...player.querySelectorAll('button, a[href], input, select, [tabindex="0"]')]
+      .filter(element => !element.disabled && !element.hidden && element.getClientRects().length);
+    const first = controls[0], last = controls.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  }
+});
+
+$('play').onclick=()=>{if(t>=1)t=0;playing=!playing;lastKey='';sync();draw()};$('restart').onclick=()=>{t=0;lastKey='';sync();draw()};$('clear-filter').onclick=()=>{selected=null;lastKey='';updateMonths();sync();draw()};$('last-contribution').onclick=()=>{const e=events.findLast(e=>e[2]===selected);if(e){t=(e[1]-start)/span;sync();draw()}};$('peak').onclick=()=>{selected=null;t=(peak-start)/span;lastKey='';sync();draw()};$('speed').onchange=e=>speed=Number(e.target.value);$('seek').oninput=e=>{t=Number(e.target.value)/10000;sync();draw()};root.querySelectorAll('[data-year]').forEach(b=>b.onclick=()=>{t=Math.max(0,Math.min(1,(Date.parse(b.dataset.year+'-01-01T00:00:00+08:00')-start)/span));sync();draw()});
+function frame(ms){if(playing&&!document.hidden){t=Math.min(1,t+Math.min(ms-last||0,80)/1000/150*speed);if(t>=1)playing=false;if(ms-lastSync>100){sync();lastSync=ms}draw()}last=ms;requestAnimationFrame(frame)}matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',e=>{if(e.matches){playing=false;sync()}});updateMonths();sync();resize();requestAnimationFrame(frame);
+})();
+</script>
+<style>
+  #translation-history {
+    --accent: #c90012;
+    --ink: #242323;
+    --muted: #77716e;
+    --line: #d9d6d3;
+    --paper: #f5f4f3;
+    --panel: #fff;
+    color: var(--ink);
+    background: var(--paper);
+    padding: 36px max(24px, calc((100vw - 1440px) / 2)) 28px;
+    font-family: Ubuntu, "PingFang SC", system-ui, sans-serif;
+  }
+  #translation-history :global(*) { box-sizing: border-box; }
+  #translation-history :global([hidden]) { display: none !important; }
+  .intro { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+  .intro a { font: 10px monospace; letter-spacing: .14em; color: var(--muted); text-decoration: none; }
+  .intro h1 { font: 600 clamp(26px, 3vw, 42px)/1.4 "Songti SC", "STSong", serif; margin: 12px 0 6px; letter-spacing: -.04em; }
+  .intro h1 span { color: var(--accent); }
+  .intro p { color: var(--muted); font-size: 12px; margin: 0; }
+  .edition { display: grid; gap: 8px; text-align: right; }
+  .edition span { color: var(--muted); font: 10px monospace; letter-spacing: .05em; }
+  .edition strong { font-size: 15px; font-weight: 500; }
+  #history-player { background: var(--panel); border: 1px solid var(--line); isolation: isolate; }
+  .player-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line); }
+  .player-title, .view-actions { display: flex; align-items: center; gap: 12px; }
+  .player-title strong { font-size: 14px; font-weight: 500; }
+  .player-title > span:last-child, #view-mode { font: 10px monospace; letter-spacing: .05em; color: var(--muted); }
+  .signal { width: 6px; height: 6px; background: var(--accent); }
+  #translation-history :global(button), #translation-history select {
+    font-family: inherit; font-size: 12px; line-height: 1.3;
+    color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 2px;
+    padding: 7px 11px; margin: 0; width: auto; min-height: 0; cursor: pointer; box-shadow: none;
+  }
+  #translation-history :global(button:hover) { background: #eeecea; border-color: #aaa4a0; }
+  #translation-history :global(button:focus-visible), #translation-history :global(input:focus-visible), #translation-history select:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  #translation-history #fullscreen { border-color: var(--ink); }
+  .observatory { display: grid; grid-template-columns: minmax(0, 1fr) 300px; }
+  .stage { position: relative; min-width: 0; background-color: #faf9f8; background-image: linear-gradient(#302c2605 1px, transparent 1px), linear-gradient(90deg, #302c2605 1px, transparent 1px); background-size: 40px 40px; }
+  .map-head { position: absolute; inset: 22px 22px auto; display: flex; justify-content: space-between; gap: 12px; z-index: 1; pointer-events: none; }
+  .eyebrow, .section-label { font: 10px/1.4 monospace; letter-spacing: .05em; color: var(--muted); }
+  h2 { font: 30px/1.2 monospace; color: var(--ink); letter-spacing: -.05em; margin: 7px 0 5px; }
+  .window-label, .legend { font-size: 10px; color: var(--muted); }
+  .legend { display: flex; gap: 14px; }
+  .stage canvas { display: block; width: 100%; height: 510px; }
+  .map-caption { position: absolute; bottom: 14px; left: 20px; right: 20px; display: flex; justify-content: space-between; gap: 12px; font: 10px monospace; color: var(--muted); }
+  aside { display: flex; flex-direction: column; gap: 10px; min-height: 0; padding: 20px; border-left: 1px solid var(--line); }
+  .metrics { display: flex; align-items: center; gap: 20px; margin-top: 12px; }
+  .metric strong { font: 32px/1 monospace; color: var(--accent); letter-spacing: -.06em; }
+  .metric span, .small-stats span { display: block; font-size: 10px; color: var(--muted); margin-top: 6px; }
+  .small-stats { display: flex; gap: 16px; }
+  .small-stats strong { display: block; font: 17px/1 monospace; }
+  .activity-label { display: flex; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 12px; margin-top: 4px; }
+  .activity-label span { color: #99918a; }
+  .filter-actions { display: flex; gap: 6px; }
+  .filter-actions:has([hidden]):not(:has(button:not([hidden]))) { display: none; }
+  #translation-history .filter-actions button { padding: 4px 8px; font-size: 10px; }
+  #ranking { display: flex; flex-direction: column; gap: 2px; max-height: 310px; overflow: auto; scrollbar-width: thin; scrollbar-color: #c6c0bb transparent; }
+  #translation-history #ranking :global(.rank) { display: flex; align-items: center; gap: 8px; padding: 4px 6px; width: 100%; border: 0; border-left: 2px solid var(--person-color); border-radius: 0; text-align: left; background: transparent; color: var(--ink); }
+  #translation-history #ranking :global(.rank:hover), #translation-history #ranking :global(.selected) { background: #eeecea; }
+  #ranking :global(.person-name) { flex: 1; min-width: 0; font-size: 11px; overflow-wrap: anywhere; }
+  #ranking :global(strong) { font: 11px monospace; color: #59524d; }
+  #translation-history :global(.avatar) { width: 24px; height: 24px; object-fit: cover; border-radius: 2px; display: block; flex-shrink: 0; background: #e8e4e0; margin: 0; }
+  .aside-note { margin: auto 0 0; font-size: 10px; line-height: 1.5; color: var(--muted); }
+  #translation-history #contributors :global(.contributor) { position: absolute; transform: translate(-50%, -50%); display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 4px 8px; background: #fffffff5; border: 1px solid #d6d0ca; border-top: 2px solid var(--person-color); padding: 8px; border-radius: 2px; width: 140px; text-align: left; }
+  #contributors :global(.avatar) { width: 28px; height: 28px; grid-row: 1 / 3; }
+  #contributors :global(span) { font-size: 11px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
+  #contributors :global(small) { font: 9px/1.3 monospace; color: var(--muted); white-space: nowrap; }
+  .stories { border-top: 1px solid var(--line); padding: 16px 20px; }
+  .story-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .story-heading h3 { font: 11px/1.3 monospace; color: var(--ink); margin: 0; }
+  .story-heading > span { font-size: 10px; color: var(--muted); }
+  #feed { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; min-height: 0; }
+  #feed :global(.event) { padding-left: 14px; border-left: 1px solid var(--line); min-width: 0; overflow-wrap: anywhere; }
+  #feed :global(.event:first-child) { border-left: 0; padding-left: 0; }
+  #feed :global(.event-head) { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  #feed :global(.event-head b) { font-size: 11px; font-weight: 500; }
+  #feed :global(.event-head span) { margin-left: auto; color: var(--accent); font-size: 10px; }
+  #feed :global(small) { display: block; color: var(--muted); font: 9px/1.5 monospace; margin-bottom: 8px; }
+  #feed :global(.before), #feed :global(.after), #feed :global(.original), #feed :global(.stage-change) { font-size: 11px; line-height: 1.7; white-space: pre-wrap; max-height: 100px; overflow: auto; padding: 6px 8px; margin-top: 6px; scrollbar-width: thin; }
+  #feed :global(.before) { color: #8a4a45; background: #f5ecea; }
+  #feed :global(.after) { color: #3f654c; background: #edf3ee; }
+  #feed :global(.original) { color: #6a6460; background: #f3f1ef; }
+  #feed :global(.stage-change) { color: #36322f; background: #f3f1ef; }
+  .transport { padding: 14px 20px; border-top: 1px solid var(--line); background: #f9f8f7; }
+  .buttons { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  #translation-history #play { background: var(--accent); color: white; border-color: var(--accent); min-width: 86px; }
+  #translation-history #play:hover { background: #a6000f; }
+  .buttons label { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 10px; margin: 0; }
+  #translation-history select { padding: 5px 7px; background: white; }
+  .buttons > span { color: var(--muted); font: 10px monospace; margin-left: 8px; }
+  .buttons .seek-label { margin-left: auto; }
+  .seek-label span { color: var(--ink); font: 11px monospace; }
+  .timeline { position: relative; margin-top: 10px; }
+  .activity { display: flex; align-items: end; gap: 5px; height: 34px; }
+  #translation-history .activity :global(.bar) { flex: 1; min-width: 0; width: 0; padding: 0; background: #dedbd7; border: 0; border-radius: 0; opacity: 1; }
+  #translation-history .activity :global(.bar.past) { background: #8e8781; }
+  #translation-history .activity :global(.bar:hover) { background: var(--accent); }
+  input[type=range] { display: block; width: 100%; height: 3px; border-radius: 0; background: #ccc5bf; accent-color: var(--accent); cursor: ew-resize; margin: 4px 0 3px; }
+  .years { display: flex; justify-content: space-between; }
+  #translation-history .years button { border: 0; color: var(--muted); padding: 2px 0; font: 10px monospace; }
+  .timeline-note { display: flex; justify-content: space-between; color: var(--muted); font: 9px monospace; margin-top: 5px; }
+  .player-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 20px; border-top: 1px solid var(--line); color: var(--muted); font: 9px/1.4 monospace; }
+  .closing { display: flex; justify-content: space-between; align-items: start; gap: 32px; margin-top: 18px; }
+  .closing p { color: var(--muted); font-size: 10px; line-height: 1.7; max-width: 900px; margin: 0; }
+  .closing a { color: var(--ink); font-size: 11px; white-space: nowrap; }
+
+  /* All viewing areas stay on one screen. The same layout is used when the
+     browser does not allow native fullscreen (for example, embedded previews). */
+  #history-player.is-immersive {
+    position: fixed; inset: 0; width: 100%; height: 100dvh; max-width: none; max-height: none;
+    z-index: 10000; margin: 0; padding: 0; border: 0; overflow: hidden;
+    display: grid; grid-template-columns: minmax(0, 1fr) 310px;
+    grid-template-rows: 44px minmax(0, 1fr) clamp(142px, 21vh, 190px) 132px 25px;
+    grid-template-areas: "toolbar toolbar" "map people" "changes people" "controls controls" "footer footer";
+  }
+  #history-player.is-immersive .player-toolbar { grid-area: toolbar; padding: 6px 16px; }
+  #history-player.is-immersive .observatory { display: contents; }
+  #history-player.is-immersive .stage { grid-area: map; min-height: 0; overflow: hidden; }
+  #history-player.is-immersive canvas { position: absolute; inset: 0; height: 100%; width: 100%; }
+  #history-player.is-immersive aside { grid-area: people; gap: 7px; padding: 14px; overflow: hidden; }
+  #history-player.is-immersive .metrics { margin-top: 8px; }
+  #history-player.is-immersive .metric strong { font-size: 28px; }
+  #history-player.is-immersive .activity-label { padding-top: 8px; margin-top: 2px; }
+  #history-player.is-immersive #ranking { flex: 1; min-height: 0; max-height: none; overflow: hidden; gap: 1px; }
+  #history-player.is-immersive #ranking :global(.rank) { flex: 1; padding: 2px 5px; min-height: 0; }
+  #history-player.is-immersive #ranking :global(.avatar) { width: 19px; height: 19px; }
+  #history-player.is-immersive #ranking :global(.person-name) { font-size: 11px; line-height: 1.1; }
+  #history-player.is-immersive .aside-note { font-size: 9px; }
+  #history-player.is-immersive .stories { grid-area: changes; display: flex; flex-direction: column; min-height: 0; padding: 10px 16px; overflow: hidden; }
+  #history-player.is-immersive .story-heading { margin-bottom: 8px; }
+  #history-player.is-immersive #feed { flex: 1; min-height: 0; gap: 10px; }
+  #history-player.is-immersive #feed :global(.event) { display: flex; flex-direction: column; min-height: 0; overflow: hidden; padding-left: 10px; }
+  #history-player.is-immersive #feed :global(.event:first-child) { padding-left: 0; }
+  #history-player.is-immersive #feed :global(.event-head) { gap: 5px; margin-bottom: 3px; }
+  #history-player.is-immersive #feed :global(.avatar) { width: 18px; height: 18px; }
+  #history-player.is-immersive #feed :global(small) { font-size: 8px; margin-bottom: 2px; line-height: 1.4; }
+  #history-player.is-immersive #feed :global(.before), #history-player.is-immersive #feed :global(.after), #history-player.is-immersive #feed :global(.original), #history-player.is-immersive #feed :global(.stage-change) { flex: 1; min-height: 0; max-height: none; font-size: 10px; line-height: 1.5; padding: 3px 6px; margin-top: 3px; }
+  #history-player.is-immersive .transport { grid-area: controls; padding: 9px 16px 6px; overflow: hidden; }
+  #history-player.is-immersive .activity { height: 29px; }
+  #history-player.is-immersive .timeline { margin-top: 7px; }
+  #history-player.is-immersive .player-footer { grid-area: footer; padding: 4px 16px; }
+  #history-player.is-immersive .map-head { inset: 14px 18px auto; }
+  #history-player.is-immersive h2 { font-size: 26px; margin: 4px 0; }
+  #history-player.is-immersive #contributors :global(.contributor) { width: 126px; padding: 5px 7px; grid-template-columns: 24px minmax(0, 1fr); gap: 3px 6px; }
+  #history-player.is-immersive #contributors :global(.avatar) { width: 24px; height: 24px; }
+  #history-player.is-immersive .map-caption { bottom: 10px; font-size: 9px; }
+
+  @media (max-width: 900px) {
+    #translation-history { padding: 24px 16px; }
+    .edition { display: none; }
+    .observatory { grid-template-columns: minmax(0, 1fr) 260px; }
+    .legend { flex-direction: column; gap: 4px; }
+    aside { padding: 16px; }
+    .metrics { gap: 14px; }
+    .small-stats { gap: 12px; }
+    #translation-history #contributors :global(.contributor) { width: 120px; grid-template-columns: 24px minmax(0, 1fr); gap: 3px 5px; padding: 6px; }
+    #contributors :global(.avatar) { width: 24px; height: 24px; }
+    #contributors :global(span) { font-size: 10px; }
+    .closing { flex-direction: column; gap: 10px; }
+    #history-player.is-immersive { grid-template-columns: minmax(0, 1fr) 260px; }
+    #history-player.is-immersive .player-title > span:last-child { display: none; }
+  }
+  @media (max-width: 650px) {
+    .intro h1 { font-size: 26px; }
+    .player-title > span:last-child, #view-mode { display: none; }
+    .player-toolbar { padding: 10px 14px; }
+    .observatory { grid-template-columns: 1fr; }
+    .stage canvas { height: 440px; }
+    aside { border-left: 0; border-top: 1px solid var(--line); }
+    #ranking { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: none; }
+    .metrics { justify-content: space-between; }
+    .small-stats { gap: 24px; }
+    #feed { grid-template-columns: 1fr; }
+    #feed :global(.event) { border-left: 0; border-top: 1px solid var(--line); padding: 10px 0 0; }
+    #feed :global(.event:first-child) { border-top: 0; padding-top: 0; }
+    .buttons { gap: 6px; }
+    .buttons > span { display: none; }
+    .buttons .seek-label { margin-left: 0; }
+    .transport, .stories { padding: 12px 14px; }
+    .player-footer { flex-wrap: wrap; gap: 4px; padding: 8px 14px; }
+    #history-player.is-immersive { grid-template-columns: 1fr; grid-template-rows: 40px minmax(0, 1fr) 174px 145px 132px 28px; grid-template-areas: "toolbar" "map" "people" "changes" "controls" "footer"; }
+    #history-player.is-immersive aside { padding: 7px 10px; gap: 4px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: 24px minmax(0, 1fr) 14px; }
+    #history-player.is-immersive .summary { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    #history-player.is-immersive #stat-label { font-size: 9px; max-width: 100px; line-height: 1.2; }
+    #history-player.is-immersive .metrics { margin: 0; gap: 10px; }
+    #history-player.is-immersive .metric { display: flex; align-items: baseline; gap: 4px; }
+    #history-player.is-immersive .metric strong { font-size: 19px; }
+    #history-player.is-immersive .metric span { margin: 0; font-size: 9px; }
+    #history-player.is-immersive .small-stats { gap: 8px; }
+    #history-player.is-immersive .small-stats strong { font-size: 12px; }
+    #history-player.is-immersive .small-stats span { margin-top: 2px; font-size: 8px; }
+    #history-player.is-immersive .activity-label { grid-column: 2; grid-row: 1; border: 0; padding: 0; margin: 0; font-size: 9px; }
+    #history-player.is-immersive .activity-label span { display: none; }
+    #history-player.is-immersive .filter-actions { grid-column: 1 / -1; grid-row: 3; justify-content: end; z-index: 1; }
+    #history-player.is-immersive .filter-actions button { padding: 0 4px; font-size: 8px; }
+    #history-player.is-immersive #ranking { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-column: 1 / -1; grid-row: 2; gap: 1px 6px; }
+    #history-player.is-immersive #ranking :global(.rank) { padding: 1px 3px; gap: 4px; }
+    #history-player.is-immersive #ranking :global(.avatar) { width: 14px; height: 14px; }
+    #history-player.is-immersive #ranking :global(.person-name), #history-player.is-immersive #ranking :global(strong) { font-size: 8px; }
+    #history-player.is-immersive .aside-note { grid-column: 1 / -1; grid-row: 3; font-size: 8px; }
+    #history-player.is-immersive .stories { padding: 7px 10px; }
+    #history-player.is-immersive #feed { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    #history-player.is-immersive #feed :global(.event) { border-top: 0; border-left: 1px solid var(--line); padding: 0 0 0 6px; }
+    #history-player.is-immersive #feed :global(.event:first-child) { border-left: 0; }
+    #history-player.is-immersive #feed :global(.event-head) { flex-wrap: wrap; gap: 2px 4px; }
+    #history-player.is-immersive #feed :global(.event-head b) { font-size: 9px; }
+    #history-player.is-immersive #feed :global(.event-head span) { font-size: 8px; }
+    #history-player.is-immersive #feed :global(small) { font-size: 7px; }
+    #history-player.is-immersive #feed :global(.before), #history-player.is-immersive #feed :global(.after), #history-player.is-immersive #feed :global(.original), #history-player.is-immersive #feed :global(.stage-change) { font-size: 9px; }
+    #history-player.is-immersive .transport { padding: 7px 10px; }
+    #history-player.is-immersive .buttons { gap: 5px; }
+    #history-player.is-immersive .buttons button { padding: 5px 7px; font-size: 10px; }
+    #history-player.is-immersive .buttons .seek-label { margin-left: auto; font-size: 9px; }
+    #history-player.is-immersive select { padding: 3px; font-size: 10px; }
+    #history-player.is-immersive .player-footer { padding: 3px 10px; font-size: 8px; gap: 2px; }
+    #history-player.is-immersive .map-head { inset: 8px 10px auto; }
+    #history-player.is-immersive h2 { font-size: 21px; }
+    #history-player.is-immersive .eyebrow, #history-player.is-immersive .window-label, #history-player.is-immersive .legend { font-size: 8px; }
+    #history-player.is-immersive .map-caption { left: 10px; right: 10px; bottom: 5px; font-size: 8px; }
+    #history-player.is-immersive #contributors :global(.contributor) { width: 96px; grid-template-columns: 18px minmax(0, 1fr); padding: 3px 4px; gap: 2px 4px; }
+    #history-player.is-immersive #contributors :global(.avatar) { width: 18px; height: 18px; }
+    #history-player.is-immersive #contributors :global(span) { font-size: 9px; }
+    #history-player.is-immersive #contributors :global(small) { font-size: 7px; }
+  }
+  @media (min-width: 651px) and (max-height: 700px) {
+    #history-player.is-immersive { grid-template-columns: minmax(0, 1fr) 330px; grid-template-rows: 40px minmax(0, 1fr) 132px 120px 23px; }
+    #history-player.is-immersive #ranking { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 8px; }
+    #history-player.is-immersive #ranking :global(.person-name), #history-player.is-immersive #ranking :global(strong) { font-size: 10px; }
+    #history-player.is-immersive .transport { padding-top: 6px; }
+    #history-player.is-immersive .activity { height: 23px; }
+  }
+</style>
