@@ -1,8 +1,8 @@
 import io
+import tempfile
 import unittest
-from types import SimpleNamespace
+from pathlib import Path
 
-from app.database.dao.hgpt import HgptDao
 from app.parser.tools.hgp import (
     DisplayInfo,
     HgptHeader,
@@ -12,7 +12,9 @@ from app.parser.tools.hgp import (
     Palette,
     TileProcessor8800,
 )
-from app.parser.tools.pillow_png import read_png
+from app.parser.tools.pillow_png import write_indexed_png
+from app.pipeline.catalog import ImageOverride
+from app.pipeline.transforms import rebuild_hgpt
 
 
 class RgbaTileProcessorTests(unittest.TestCase):
@@ -53,25 +55,7 @@ class RgbaTileProcessorTests(unittest.TestCase):
         self.assertEqual(decoded.palette, None)
         self.assertEqual(decoded.content, pixels)
 
-    def test_rgba_image_exports_to_png(self):
-        display = DisplayInfo(width=2, height=2)
-        pixels = [
-            (255, 0, 0, 255),
-            (0, 255, 0, 128),
-            (0, 0, 255, 64),
-            (255, 255, 255, 0),
-        ]
-
-        encoded = HgptDao._export_to_png(
-            HgptImage(HgptHeader(), display, pixels)
-        )
-        decoded = read_png(encoded)
-
-        self.assertEqual((decoded.width, decoded.height), (2, 2))
-        self.assertIsNone(decoded.palette)
-        self.assertEqual(list(decoded.pixels[:8]), [255, 0, 0, 255, 0, 255, 0, 128])
-
-    def test_indexed_image_round_trips_through_database_png(self):
+    def test_indexed_image_round_trips_through_image_override(self):
         display = DisplayInfo(width=2, height=2)
         palette = Palette(
             [
@@ -82,22 +66,20 @@ class RgbaTileProcessorTests(unittest.TestCase):
             ]
             + [(0, 0, 0, 255)] * 12
         )
-        exported = HgptDao._export_to_png(
+        original = io.BytesIO()
+        HgptWriter(
             HgptImage(HgptHeader(), display, [0, 1, 2, 3], palette)
+        ).write(original)
+        translated_png = write_indexed_png(
+            2, 2, bytes((0, 1, 2, 3)), palette.colors
         )
-        record = SimpleNamespace(
-            png_translated=exported,
-            png_image=exported,
-            has_extended_header=False,
-            unknown_two=0,
-            unknown_three=0x13,
-            width=2,
-            height=2,
-            division_name=None,
-            divisions=None,
-        )
-
-        rebuilt = HgptDao._rebuild_from_png(record)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "translated.png"
+            path.write_bytes(translated_png)
+            rebuilt = rebuild_hgpt(
+                original.getvalue(),
+                ImageOverride(prefix="unused", path=path, digest="unused"),
+            )
         restored = HgptReader(io.BytesIO(rebuilt)).read()
 
         self.assertEqual(restored.content, [0, 1, 2, 3])

@@ -418,7 +418,7 @@ def _atomic_save_archive(archive: HGArchive, target: Path) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build translated resources without an intermediate database"
+        description="Build translated resources directly from source assets"
     )
     parser.add_argument(
         "--source",

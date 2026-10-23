@@ -245,7 +245,7 @@ def compare_trees(reference: Path, candidate: Path) -> dict:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Compare database and streaming resource output trees"
+        description="Compare two resource output trees"
     )
     parser.add_argument("reference", type=Path)
     parser.add_argument("candidate", type=Path)

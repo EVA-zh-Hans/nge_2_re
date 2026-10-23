@@ -1,4 +1,5 @@
 import hashlib
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -6,23 +7,32 @@ from pathlib import Path
 from app.parser.tools.evs import EvsWrapper, get_number_of_parameters
 from app.parser.tools.hgar import HGArchive, HGArchiveFile
 from app.parser.tools.text import TextArchive
-from app.database.dao.translation import TranslationDao
 from app.pipeline.catalog import CevOverride, TranslationCatalog
 from app.pipeline.transforms import transform_evs, transform_text_archive
 
 
 class StreamTransformTests(unittest.TestCase):
-    def test_translation_import_preparation_uses_last_value_per_key(self):
-        translations, skipped = TranslationDao.prepare_translations(
-            [
-                {"key": "same", "translation": "first"},
-                {"key": "same", "translation": "last"},
-                {"key": "empty", "translation": ""},
-            ]
-        )
+    def test_translation_catalog_uses_last_value_per_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            translations = root / "translations.json"
+            translations.write_text(
+                json.dumps(
+                    [
+                        {"key": "same", "translation": "first"},
+                        {"key": "same", "translation": "last"},
+                        {"key": "empty", "translation": ""},
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            cev_dir = root / "cev"
+            cev_dir.mkdir()
 
-        self.assertEqual(translations, {"same": "last"})
-        self.assertEqual(skipped, 1)
+            catalog = TranslationCatalog.load([translations], cev_dir)
+
+        self.assertEqual(catalog.generic, {"same": "last"})
+        self.assertEqual(len(catalog.generic_conflicts), 1)
 
     def test_text_transform_rebuilds_shared_strings(self):
         original = "original"

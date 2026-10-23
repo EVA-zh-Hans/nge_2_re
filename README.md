@@ -110,10 +110,9 @@
 
 ```
 app/
-├─ cli/      # 主程序
-├─ database/      # SQL数据库定义
+├─ pipeline/       # 按需转换翻译、图像和游戏资源
 ├─ elf_patch/      # 生成 SJIS 文本翻译文件 EBTRANS.BIN
-├─ parser/tools/   # 资源解析脚本（修改自原仓库）
+├─ parser/tools/   # 资源解析与写回工具（修改自原仓库）
 plugin/
 ├─ 启动器与内存修改逻辑（C 语言）
 scripts/
@@ -133,7 +132,7 @@ scripts/
 
 ## 🚀 Roadmap
 
-- [x] 关系型数据库存储解析内容  
+- [x] 按需解析和重建游戏资源
 - [x] 一键导出与导入待翻译文本  
 - [x] 引入大模型（如 Sakura）进行机翻  
 - [x] 完整项目结构可一键 Patch  

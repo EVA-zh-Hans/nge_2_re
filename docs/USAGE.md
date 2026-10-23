@@ -61,7 +61,7 @@
 
 ## 运行方式（命令行）
 
-使用 Makefile 中封装的任务或直接使用 `uv run -m` / `python3 -m` 调用模块。
+使用 Makefile 中封装的任务，或直接通过 `uv run -m` 调用对应模块。
 
 常见示例：
 
@@ -71,16 +71,10 @@
   AUTH_KEY=<your-api-key> make download_trans
   ```
 
-- 导入下载的翻译：
+- 按需构建翻译后的游戏资源：
 
   ```sh
-  make import_trans
-  ```
-
-- 导出游戏资源：
-
-  ```sh
-  make export_all
+  make export_resources
   ```
 
 - 仅重打 ISO（假如已经生成了替换后的游戏文件）：
@@ -97,11 +91,9 @@
 
 ## 常用 Make 目标说明
 
-- `make init_db`：初始化/重建项目数据库（首次运行需要）。
-- `make import_all`：导入所有游戏资源（hgar、文本、绑定、图片等）。
 - `make download_trans`：从 ParaTranz 下载并合并翻译文件，使用 `AUTH_KEY` 环境变量提供 API 密钥。
-- `make import_trans`：将下载好的翻译导入数据库。
-- `make export_all`：生成替换后的二进制、文本和 hgar 文件，准备打包回 ISO。
+- `make export_resources`：直接读取源资源、翻译和图片，生成替换后的 TEXT、BIND 和 HGAR 文件。
+- `make export_eboot_trans`：生成运行时使用的 EBOOT 翻译二进制。
 - `make plugin`：编译插件并复制到导出目录（需要 `plugin` 子项目的构建工具）。
 - `make decrypt_eboot`：使用 `pspdecrypt` 解密 EBOOT（依赖第三方工具）。
 - `make patch_iso`：执行 `repack_iso` + `gen_xdelta`，产出 `*_patched.iso` 与 xdelta 补丁。
@@ -114,19 +106,15 @@
    AUTH_KEY=<your-api-key> make download_trans
    ```
 
-2. 导入下载好的翻译：
+2. 按需构建游戏资源：
 
    ```sh
-   make import_trans
+   make generate_memtalk_templates
+   make export_resources
+   make export_eboot_trans
    ```
 
-3. 导出游戏资源以便本地测试：
-
-   ```sh
-   make export_all
-   ```
-
-4. 若要只重新打包 ISO（已生成 `build/ULJS00064` 目录）：
+3. 若要只重新打包 ISO（已生成 `build/ULJS00064` 目录）：
 
    ```sh
    make repack_iso
@@ -148,12 +136,12 @@
 
 ## 其他说明
 
-- 如果你偏好不使用 `uv`，也可以把 Makefile 中的 `UV_RUN` 和 `PYTHON_MAIN` 替换为 `python3`（例如 `PYTHON_MAIN := python3 -m app.cli.main`）。
+- 如果你偏好不使用 `uv`，可以把 Makefile 中的 `UV_RUN` 替换为 `python3`。
 - 若需要构建第三方工具（如 `pspdecrypt`、`pgftool`），请进入 `third_party/*` 或 `plugin` 目录并按各自 `Makefile` 的说明构建。
 - 更多详情请参阅项目根目录的 `README.md`。
 
 ### 翻译调试
 
 1. 运行 `AUTH_KEY=<your-api-key> make download_trans` 下载翻译并进行预处理
-2. 运行 `make import_trans` 导入下载好的翻译
-3. 运行 `make export_all` 导出游戏资源文件
+2. 运行 `make generate_memtalk_templates` 生成运行时模板
+3. 运行 `make export_resources` 按需生成游戏资源文件
