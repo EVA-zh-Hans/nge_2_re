@@ -2,13 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import argparse
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import pycdlib
 
 
-def unpack_iso9660(
-    iso_path: Path, out_dir: Path, *, strip_version: bool = True
-) -> None:
+def unpack_iso9660(iso_path: Path, out_dir: Path) -> None:
     """
     Extract all files from an ISO9660 image using pycdlib.
 
@@ -18,8 +16,6 @@ def unpack_iso9660(
         Input ISO file.
     out_dir : Path
         Output folder for extracted files.
-    strip_version : bool
-        Remove the ISO9660 version suffix ";1" from filenames.
     """
     if not iso_path.exists():
         raise FileNotFoundError(f"ISO file not found: {iso_path}")
@@ -37,19 +33,41 @@ def unpack_iso9660(
         current_dir.mkdir(parents=True, exist_ok=True)
 
         for file in files:
-            filename = file
-            if strip_version:
-                filename = filename.replace(";1", "")
+            output_file = current_dir / file
 
-            output_file = current_dir / filename
-
-            print(f"Extracting: {relative}/{filename}")
+            print(f"Extracting: {relative}/{file}")
 
             # Extract file
             with output_file.open("wb") as f:
                 iso.get_file_from_iso_fp(f, iso_path=f"{dirname}/{file}")
 
     iso.close()
+
+
+def unpack_iso_file(
+    iso_path: Path,
+    out_dir: Path,
+    iso_file: str,
+) -> None:
+    """Extract one file while preserving its directory path inside the ISO."""
+    if not iso_path.exists():
+        raise FileNotFoundError(f"ISO file not found: {iso_path}")
+    if not iso_file.startswith("/") or ".." in PurePosixPath(iso_file).parts:
+        raise ValueError("ISO file path must be absolute and cannot contain '..'")
+
+    relative = iso_file.lstrip("/")
+    output_file = out_dir / relative
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    iso = pycdlib.PyCdlib()
+    iso.open(str(iso_path))
+    try:
+        with output_file.open("wb") as file_handle:
+            iso.get_file_from_iso_fp(file_handle, iso_path=iso_file)
+    finally:
+        iso.close()
+
+    print(f"Extracting: {relative}")
 
 
 def build_cli():
@@ -64,9 +82,9 @@ def build_cli():
         help="Directory to output extracted files.",
     )
     parser.add_argument(
-        "--keep-version",
-        action="store_true",
-        help="Keep ISO9660 filename version suffix (e.g., ';1').",
+        "--only",
+        metavar="ISO_PATH",
+        help="Extract only this absolute ISO9660 file path.",
     )
 
     return parser
@@ -77,9 +95,14 @@ def main():
     args = parser.parse_args()
 
     try:
-        unpack_iso9660(
-            iso_path=args.iso, out_dir=args.output, strip_version=not args.keep_version
-        )
+        if args.only:
+            unpack_iso_file(
+                iso_path=args.iso,
+                out_dir=args.output,
+                iso_file=args.only,
+            )
+        else:
+            unpack_iso9660(iso_path=args.iso, out_dir=args.output)
     except Exception as e:
         print(f"Error: {e}")
         raise SystemExit(1)

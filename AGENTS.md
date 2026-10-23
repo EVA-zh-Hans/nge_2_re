@@ -62,11 +62,11 @@ Make target that matches the task.
 
 | Task | Preferred command | Main input | Main output |
 | --- | --- | --- | --- |
-| Full patch build | `make full_build` | `temp/ULJS00064.iso`, optionally `temp/ULJS00061.iso` | Patched ISOs, xdelta patches, metadata |
+| Full patch build | `make full_build` | `temp/ULJS00064.iso`, `temp/ULJS00061.iso` | Patched ISOs, xdelta patches, metadata |
 | Download translations | `AUTH_KEY=... make download_trans` | `AUTH_KEY` | `temp/downloads/` |
-| Build translated resources | `make export_resources` | Extracted `USRDIR`, translations, and images | `build/ULJS00064/PSP_GAME/USRDIR/` |
+| Build translated resources | `make export_resources` | Extracted `USRDIR`, translations, and images | `build/common/PSP_GAME/USRDIR/` |
 | Build the PSP plugin | `make plugin` | PSPDEV toolchain | `EBOOT.BIN` and `EVA2RT.PRX` in the build tree |
-| Decrypt EBOOT | `make decrypt_eboot` | Original `EBOOT.BIN` | `build/ULJS00064/PSP_GAME/SYSDIR/BOOT.BIN` |
+| Decrypt EBOOT | `make decrypt_eboot` | Original `EBOOT.BIN` | `build/common/PSP_GAME/SYSDIR/BOOT.BIN` |
 | Generate metadata | `make gen_metadata` | Exported game tree | `build/metadata.json`, image, and raw metadata |
 | Build one patch | `make patch_iso GAME_ID=00064` | Original ISO and exported game tree | Timestamped patched ISO and xdelta |
 | Build both game IDs | `make patch_all_ids` | `00061` and `00064` source ISOs | Patches for both IDs |
@@ -80,7 +80,7 @@ commits.
 
 `make full_build` intentionally runs these stages in order:
 
-1. Extract the source ISO.
+1. Extract the source ISO selected by `GAME_ID`.
 2. Generate runtime MemTalk templates.
 3. Build translated resources on demand and inject the staff roll.
 4. Generate the EBOOT translation binary.
@@ -88,7 +88,8 @@ commits.
 6. Decrypt and prepare EBOOT files.
 7. Copy font assets.
 8. Generate metadata.
-9. Repack both supported game IDs and generate xdelta patches.
+9. Copy the common overlay into per-ID staging directories, then repack both
+   supported game IDs and generate xdelta patches in parallel.
 
 Keep this ordering deterministic and idempotent.
 

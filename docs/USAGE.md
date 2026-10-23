@@ -11,7 +11,7 @@
    1. 运行 `pacman -Ss uv`
 4. 克隆本仓库
    1. 目录位于 `C:\msys64\home\<user-name>\nge_2_re`
-   2. 在该文件夹下创建 `temp` 目录，将提取出的游戏镜像命名为 `ULJS00064.iso` 并放入 `temp` 目录
+   2. 在该文件夹下创建 `temp` 目录，将提取出的游戏镜像分别命名为 `ULJS00064.iso` 和 `ULJS00061.iso` 并放入 `temp` 目录
 5. 运行 `make full_build`
 6. 在 `build` 目录下会生成打好补丁的ISO
 
@@ -42,13 +42,13 @@
 
    > 注：本项目的 Makefile 使用 `uv run` 来调用模块，安装 `uv` 可使 `uv run -m ...` 可用；也可改用 `python3 -m` 直接执行。
 
-3. 克隆本仓库到工作目录并创建 `temp` 目录；将原始游戏镜像命名为 `ULJS00064.iso` 并放入 `temp`：
+3. 克隆本仓库到工作目录并创建 `temp` 目录；将两个原始游戏镜像分别命名为 `ULJS00064.iso` 和 `ULJS00061.iso` 并放入 `temp`：
 
    ```sh
    git clone <repo-url>
    cd nge_2_re
    mkdir -p temp
-   # 将 ULJS00064.iso 放到 temp/ 下
+   # 将 ULJS00064.iso 和 ULJS00061.iso 放到 temp/ 下
    ```
 
 4. 运行完整构建：
@@ -118,10 +118,10 @@
    make export_eboot_trans
    ```
 
-3. 若要只重新打包 ISO（已生成 `build/ULJS00064` 目录）：
+3. 若要只重新打包 ISO（已生成 `build/common` 公共资源目录）：
 
    ```sh
-   make repack_iso
+   make patch_iso GAME_ID=00064
    ```
 
 ## 故障排查（常见问题）
@@ -133,7 +133,7 @@
   - 安装系统包（例如 Ubuntu 上的 `xdelta3`），或查看 `third_party` 目录下的构建说明并运行对应的 `make`。
 
 - ISO 未找到或名称错误：
-  - 确保原始镜像位于 `temp/ULJS00064.iso`，Makefile 使用该路径进行抽取与对比生成补丁。
+  - 确保两个原始镜像分别位于 `temp/ULJS00064.iso` 和 `temp/ULJS00061.iso`，Makefile 使用对应镜像生成补丁。
 
 - 权限问题或文件被占用：
   - 在 Windows 下使用 MSYS2 的 MINGW64 终端运行，避免直接在原始 Windows 命令行中执行部分 POSIX 命令。

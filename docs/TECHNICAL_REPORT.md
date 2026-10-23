@@ -28,7 +28,7 @@ the authoritative binary input for every build.
 
 `make export_resources` invokes `app.pipeline.stream_build` with the extracted
 `USRDIR`, downloaded translations, and translated PNG assets. It writes the
-result to `build/ULJS00064/PSP_GAME/USRDIR`.
+result to `build/common/PSP_GAME/USRDIR`.
 
 The pipeline loads translation and image catalogs once, then processes
 standalone TEXT and BIND files and HGAR archives. Unchanged resources are copied
@@ -47,7 +47,7 @@ changes, conflicts, mismatches, and unmatched translation/image inputs.
 
 `make full_build` runs these stages in order:
 
-1. Extract the ULJS00064 source ISO.
+1. Extract the source ISO selected by `GAME_ID`.
 2. Generate runtime MemTalk templates.
 3. Build translated resources directly from source assets.
 4. Generate `EBTRANS.BIN`.
@@ -56,8 +56,10 @@ changes, conflicts, mismatches, and unmatched translation/image inputs.
 7. Copy font assets and generate metadata.
 8. Repack both supported game IDs and generate xdelta patches.
 
-The supported IDs are `ULJS-00061` and `ULJS-00064`. The assembly tree is
-normalized under `build/ULJS00064` for both outputs.
+The supported IDs are `ULJS-00061` and `ULJS-00064`. Shared assets are built
+under `build/common`, then copied to separate per-ID staging directories. Each
+staging directory receives the `PARAM.SFO` extracted from its matching source
+ISO before both outputs are repacked in parallel.
 
 ## Binary Formats
 
