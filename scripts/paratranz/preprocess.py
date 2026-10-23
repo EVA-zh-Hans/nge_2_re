@@ -5,7 +5,6 @@ This script preprocesses translation files for Paratranz by normalizing newline 
 and computing MD5 hashes for keys in JSON files.
 """
 
-import os
 import argparse
 import json
 import hashlib
