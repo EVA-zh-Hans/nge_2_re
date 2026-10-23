@@ -65,21 +65,41 @@ def unpack_iso_file(
     if not iso_file.startswith("/") or ".." in PurePosixPath(iso_file).parts:
         raise ValueError("ISO file path must be absolute and cannot contain '..'")
 
-    relative = iso_file.lstrip("/")
-    if strip_version:
-        relative = relative.replace(";1", "")
-    output_file = out_dir / relative
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-
     iso = pycdlib.PyCdlib()
     iso.open(str(iso_path))
     try:
+        requested = _strip_iso_version(iso_file.lstrip("/")).casefold()
+        matched_path = None
+        for dirname, _, files in iso.walk(iso_path="/"):
+            for filename in files:
+                candidate = f"{dirname}/{filename}".lstrip("/")
+                if _strip_iso_version(candidate).casefold() == requested:
+                    matched_path = f"/{candidate}"
+                    break
+            if matched_path:
+                break
+
+        if not matched_path:
+            raise FileNotFoundError(f"ISO file not found: {iso_file}")
+
+        relative = matched_path.lstrip("/")
+        if strip_version:
+            relative = _strip_iso_version(relative)
+        output_file = out_dir / relative
+        output_file.parent.mkdir(parents=True, exist_ok=True)
         with output_file.open("wb") as file_handle:
-            iso.get_file_from_iso_fp(file_handle, iso_path=iso_file)
+            iso.get_file_from_iso_fp(file_handle, iso_path=matched_path)
     finally:
         iso.close()
 
     print(f"Extracting: {relative}")
+
+
+def _strip_iso_version(path: str) -> str:
+    base, separator, version = path.rpartition(";")
+    if separator and version.isdigit():
+        return base
+    return path
 
 
 def build_cli():

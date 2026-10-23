@@ -150,7 +150,7 @@ extract_iso:
 extract_sfo:
 	@echo "Extracting PARAM.SFO for GAME_ID=$(GAME_ID)..."
 	$(UV_RUN) scripts/pack/unpack.py \
-		--only '/PSP_GAME/PARAM.SFO;1' \
+		--only '/PSP_GAME/PARAM.SFO' \
 		-o '$(TEMP_DIR)/ULJS$(GAME_ID)' \
 		'$(TEMP_DIR)/ULJS$(GAME_ID).iso'
 
