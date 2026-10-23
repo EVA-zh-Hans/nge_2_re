@@ -6,28 +6,26 @@ import argparse
 import hashlib
 import json
 import os
-import re
 import sys
 import time
 from collections import Counter
 from pathlib import Path
 from typing import Any, Iterable
-import unicodedata
 from urllib.parse import urlsplit, urlunsplit
 
 import requests
 from dotenv import load_dotenv
 
-from scripts.check import CheckContext, RULES, Term
+from scripts.paratranz.validation import (
+    parse_terms as _terms,
+    relevant_terms as _relevant_terms,
+    validate_translation,
+)
 
 PROJECT_ID = 10882
 PARATRANZ_BASE_URL = "https://paratranz.cn/api"
 DEFAULT_PAGE_SIZE = 1000
 DEFAULT_BATCH_SIZE = 5
-EVA_SPECIAL_CHARACTERS = "ΘΑΤΝΣＳ"
-LAYOUT_SPACE_RE = re.compile(r" {2,}")
-CJK_LATIN_SPACE_RE = re.compile(r"[\u3400-\u9fff\uf900-\ufaff] [A-Za-z0-9]|[A-Za-z0-9] [\u3400-\u9fff\uf900-\ufaff]")
-ELLIPSIS_PUNCTUATION_RE = re.compile(r"(?:……|…)[，。,.]|[，。,.](?:……|…)")
 
 
 def _result_list(payload: Any, endpoint: str) -> list[dict[str, Any]]:
@@ -212,71 +210,6 @@ def _string_file_id(item: dict[str, Any]) -> int | None:
         return int(value) if value is not None else None
     except (TypeError, ValueError):
         return None
-
-
-def _terms(raw_terms: Iterable[dict[str, Any]]) -> tuple[Term, ...]:
-    result = []
-    seen = set()
-    for entry in raw_terms:
-        source = next((entry.get(key) for key in ("term", "source", "original") if isinstance(entry.get(key), str) and entry[key]), None)
-        target = next((entry.get(key) for key in ("translation", "target", "translated") if entry.get(key)), None)
-        targets = (target,) if isinstance(target, str) else tuple(target) if isinstance(target, list) else ()
-        targets = tuple(value for value in targets if isinstance(value, str) and value)
-        variants = entry.get("variants", [])
-        sources = [source] if source else []
-        if isinstance(variants, list):
-            sources.extend(value for value in variants if isinstance(value, str) and value)
-        for term_source in sources:
-            identity = (term_source, targets)
-            if targets and identity not in seen:
-                result.append(Term(term_source, targets))
-                seen.add(identity)
-    return tuple(result)
-
-
-def _relevant_terms(source: str, terms: tuple[Term, ...]) -> list[dict[str, Any]]:
-    return [{"source": term.source, "translations": list(term.translations)} for term in terms if term.source in source]
-
-
-def _invisible_characters(value: str) -> list[str]:
-    return [
-        char for char in value
-        if unicodedata.category(char) in {"Cc", "Cf"} and char not in "\r\n"
-    ]
-
-
-def validate_translation(source: str, translation: str, terms: tuple[Term, ...]) -> list[dict[str, str]]:
-    if not isinstance(translation, str) or not translation.strip():
-        return [{"rule": "empty_translation", "severity": "error", "message": "Translation is empty"}]
-    issues = RULES.check(CheckContext(source, translation, "text", terms))
-    records = [{"rule": issue.rule, "severity": issue.severity, "message": issue.message} for issue in issues]
-    if source.count("\n") != translation.count("\n") or source.count("\\n") != translation.count("\\n"):
-        records.append({
-            "rule": "line_breaks",
-            "severity": "error",
-            "message": "Line break markers do not match the original",
-        })
-    if "..." in translation or "…?" in translation or "…？" in translation or ELLIPSIS_PUNCTUATION_RE.search(translation):
-        records.append({"rule": "ellipsis_style", "severity": "error", "message": "Use Chinese ellipsis and do not combine it with commas or full stops"})
-    if source.strip() == "…" and translation.strip() == "…":
-        records.append({"rule": "ellipsis_style", "severity": "warning", "message": "A standalone ellipsis should preferably be rendered as ……"})
-    if any(char in translation for char in "~"):
-        records.append({"rule": "fullwidth_tilde", "severity": "error", "message": "Use the fullwidth tilde ～ instead of ASCII ~"})
-    if translation.count("-") > source.count("-"):
-        records.append({"rule": "dash_style", "severity": "error", "message": "Use an em dash — unless the original contains the ASCII hyphen"})
-    if CJK_LATIN_SPACE_RE.search(translation):
-        records.append({"rule": "cjk_latin_spacing", "severity": "error", "message": "Do not add spaces between Chinese and English characters"})
-    if any(char in translation for char in '\"“”‘’'):
-        records.append({"rule": "corner_quotes", "severity": "error", "message": "Use 「」 for quotation marks"})
-    source_special = Counter(char for char in source if char in EVA_SPECIAL_CHARACTERS)
-    translation_special = Counter(char for char in translation if char in EVA_SPECIAL_CHARACTERS)
-    if source_special != translation_special:
-        records.append({"rule": "eva_special_characters", "severity": "error", "message": "Preserve EVA special glyphs Θ Α Τ Ν Σ and Ｓ exactly"})
-    if _invisible_characters(source) != _invisible_characters(translation):
-        records.append({"rule": "invisible_characters", "severity": "error", "message": "Preserve invisible control and format characters exactly"})
-    if len(LAYOUT_SPACE_RE.findall(source)) > len(LAYOUT_SPACE_RE.findall(translation)):
-        records.append({"rule": "layout_spaces", "severity": "warning", "message": "Preserve repeated spaces used for layout where possible"})
-    return records
 
 
 def chat_completions_url(base_url: str) -> str:
