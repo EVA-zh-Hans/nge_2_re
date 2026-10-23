@@ -136,10 +136,12 @@ def check_files(
     files: Iterable[Tuple[Path, str]],
     terms: Tuple[Term, ...] = (),
     display_root: Optional[Path] = None,
+    rule_names: Optional[Iterable[str]] = None,
 ) -> Tuple[List[dict], dict]:
     """Check translation files and return issue records and summary counts."""
     file_list = list(files)
     root = display_root or Path.cwd()
+    selected_rules = None if rule_names is None else tuple(rule_names)
     issues = []
     total_entries = 0
     checked_entries = 0
@@ -203,7 +205,7 @@ def check_files(
                 _issue_record(
                     issue, path, root, check_type, index, key, source, translation
                 )
-                for issue in RULES.check(context)
+                for issue in RULES.check(context, selected_rules)
             )
 
     rule_counts = Counter(issue["rule"] for issue in issues)
@@ -214,6 +216,7 @@ def check_files(
         "checked": checked_entries,
         "skipped": skipped_entries,
         "issues": len(issues),
+        "rules": list(RULES.names if selected_rules is None else selected_rules),
         "by_rule": dict(sorted(rule_counts.items())),
         "by_severity": dict(sorted(severity_counts.items())),
     }
@@ -253,6 +256,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--terms-file", type=Path, help="ParaTranz terminology JSON")
     parser.add_argument("--report", type=Path, help="Combined JSON report path")
     parser.add_argument(
+        "--rule",
+        dest="rules",
+        action="append",
+        choices=RULES.names,
+        help="Run only this validation rule; may be repeated",
+    )
+    parser.add_argument(
         "--strict",
         action="store_true",
         help="Return a non-zero status when translation issues are found",
@@ -280,7 +290,9 @@ def _run_batch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int
         raise FileNotFoundError(
             f"No normalized translation files found in: {args.downloads_dir}"
         )
-    issues, summary = check_files(files, terms, args.downloads_dir)
+    issues, summary = check_files(
+        files, terms, args.downloads_dir, rule_names=args.rules
+    )
     write_report(args.report, issues, summary)
     logger.info(
         "Checked %d entries in %d files: %d issue(s); report: %s",
@@ -299,7 +311,9 @@ def _run_legacy(args: argparse.Namespace, parser: argparse.ArgumentParser) -> in
         parser.error(
             "provide --downloads-dir/--report or TRANSLATION_FILE REPORT_FILE TYPE"
         )
-    issues, summary = check_files([(args.translation_file, args.type)])
+    issues, summary = check_files(
+        [(args.translation_file, args.type)], rule_names=args.rules
+    )
     write_report(args.legacy_report_file, issues, summary)
     logger.info(
         "Checked %d entries: %d issue(s); report: %s",
