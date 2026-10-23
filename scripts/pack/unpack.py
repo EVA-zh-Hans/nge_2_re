@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import argparse
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import pycdlib
 
 
@@ -52,6 +52,36 @@ def unpack_iso9660(
     iso.close()
 
 
+def unpack_iso_file(
+    iso_path: Path,
+    out_dir: Path,
+    iso_file: str,
+    *,
+    strip_version: bool = True,
+) -> None:
+    """Extract one file while preserving its directory path inside the ISO."""
+    if not iso_path.exists():
+        raise FileNotFoundError(f"ISO file not found: {iso_path}")
+    if not iso_file.startswith("/") or ".." in PurePosixPath(iso_file).parts:
+        raise ValueError("ISO file path must be absolute and cannot contain '..'")
+
+    relative = iso_file.lstrip("/")
+    if strip_version:
+        relative = relative.replace(";1", "")
+    output_file = out_dir / relative
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    iso = pycdlib.PyCdlib()
+    iso.open(str(iso_path))
+    try:
+        with output_file.open("wb") as file_handle:
+            iso.get_file_from_iso_fp(file_handle, iso_path=iso_file)
+    finally:
+        iso.close()
+
+    print(f"Extracting: {relative}")
+
+
 def build_cli():
     parser = argparse.ArgumentParser(description="Extract files from an ISO9660 image.")
 
@@ -68,6 +98,11 @@ def build_cli():
         action="store_true",
         help="Keep ISO9660 filename version suffix (e.g., ';1').",
     )
+    parser.add_argument(
+        "--only",
+        metavar="ISO_PATH",
+        help="Extract only this absolute ISO9660 file path.",
+    )
 
     return parser
 
@@ -77,9 +112,19 @@ def main():
     args = parser.parse_args()
 
     try:
-        unpack_iso9660(
-            iso_path=args.iso, out_dir=args.output, strip_version=not args.keep_version
-        )
+        if args.only:
+            unpack_iso_file(
+                iso_path=args.iso,
+                out_dir=args.output,
+                iso_file=args.only,
+                strip_version=not args.keep_version,
+            )
+        else:
+            unpack_iso9660(
+                iso_path=args.iso,
+                out_dir=args.output,
+                strip_version=not args.keep_version,
+            )
     except Exception as e:
         print(f"Error: {e}")
         raise SystemExit(1)
