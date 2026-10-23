@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.check import check_files
+from scripts.check import build_parser, check_files
 from scripts.paratranz.validation import (
     RULES,
     CheckContext,
@@ -52,6 +52,28 @@ class TranslationRuleTests(unittest.TestCase):
     def test_unknown_resource_type_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "Unknown check type"):
             RULES.check(CheckContext("source", "translation", "unknown"))
+
+    def test_selected_rules_are_the_only_rules_executed(self):
+        context = CheckContext("Hello $m", "中文 text...", "text")
+        issues = RULES.check(context, ("format_markers",))
+        self.assertEqual(["format_markers"], [issue.rule for issue in issues])
+
+        with self.assertRaisesRegex(ValueError, "Unknown validation rules"):
+            RULES.check(context, ("not_a_rule",))
+
+    def test_rule_cli_option_can_be_repeated(self):
+        args = build_parser().parse_args(
+            [
+                "input.json",
+                "report.json",
+                "text",
+                "--rule",
+                "format_markers",
+                "--rule",
+                "encoding",
+            ]
+        )
+        self.assertEqual(["format_markers", "encoding"], args.rules)
 
     def test_terms_include_variants_and_remove_duplicates(self):
         terms = parse_terms(
@@ -121,6 +143,32 @@ class TranslationReportTests(unittest.TestCase):
         self.assertEqual(1, summary["checked"])
         self.assertEqual(1, summary["skipped"])
         self.assertTrue(all(issue["file"] == "sample.json" for issue in issues))
+
+    def test_batch_report_contains_only_selected_rule(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            translation_file = root / "sample.json"
+            translation_file.write_text(
+                json.dumps(
+                    [
+                        {
+                            "original": "Hello $m",
+                            "translation": "中文 text...",
+                        }
+                    ],
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            issues, summary = check_files(
+                [(translation_file, "text")],
+                display_root=root,
+                rule_names=("format_markers",),
+            )
+
+        self.assertEqual(["format_markers"], [issue["rule"] for issue in issues])
+        self.assertEqual(["format_markers"], summary["rules"])
 
 
 if __name__ == "__main__":

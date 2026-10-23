@@ -14,6 +14,24 @@
 uv run python -m scripts.check tev.json build/tev_report.json text
 ```
 
+只执行 `format_markers` 规则：
+
+```sh
+uv run python -m scripts.check tev.json build/tev_report.json text \
+  --rule format_markers
+```
+
+`--rule` 可以重复使用。以下命令只检查运行时标记和编码：
+
+```sh
+uv run python -m scripts.check tev.json build/tev_report.json text \
+  --rule format_markers \
+  --rule encoding
+```
+
+未提供 `--rule` 时执行该类型适用的全部规则。输入条目结构检查始终执行，不受规则筛选
+影响。
+
 检查 EVS 或 EBOOT 文件时，将最后一个参数分别改为 `evs` 或 `eboot`：
 
 ```sh

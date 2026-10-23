@@ -73,12 +73,29 @@ class RuleRegistry:
 
         return decorator
 
-    def check(self, context: CheckContext) -> list[ValidationIssue]:
+    @property
+    def names(self) -> tuple[str, ...]:
+        """Return registered rule names in execution order."""
+        return tuple(name for name, _, _ in self._rules)
+
+    def check(
+        self,
+        context: CheckContext,
+        rule_names: Iterable[str] | None = None,
+    ) -> list[ValidationIssue]:
         if context.check_type not in CHECK_TYPES:
             raise ValueError(f"Unknown check type: {context.check_type}")
 
+        selected_rules = None if rule_names is None else frozenset(rule_names)
+        if selected_rules is not None:
+            unknown_rules = selected_rules - set(self.names)
+            if unknown_rules:
+                raise ValueError(f"Unknown validation rules: {sorted(unknown_rules)}")
+
         issues = []
         for name, check_types, rule in self._rules:
+            if selected_rules is not None and name not in selected_rules:
+                continue
             if check_types and context.check_type not in check_types:
                 continue
             for issue in rule(context):
