@@ -32,7 +32,7 @@ help:
 	@echo "  make generate_memtalk_templates - Generate Runtime MemTalk C templates"
 	@echo "  make generate_staff_roll - Generate translated Staff Roll assets"
 	@echo "  make preview_staff_roll  - Generate and open the Staff Roll PNG preview"
-	@echo "  make inject_staff_roll   - Inject staff21.hpt into exported staff.har"
+	@echo "  make inject_staff_roll   - Deprecated alias for export_resources"
 	@echo "  make export_resources    - Build translated resources on demand"
 	@echo "  make export_eboot_trans  - Generate the EBOOT translation binary"
 	@echo "  make gen_metadata        - Generate patch metadata (JSON and image)"
@@ -83,10 +83,10 @@ preview_staff_roll: generate_staff_roll
 		echo "Preview: $(BUILD_DIR)/generated/staff_roll/staff_roll.png"; \
 	fi
 
-inject_staff_roll: generate_staff_roll
-	@echo "Injecting translated Staff Roll..."
-	$(UV_RUN) scripts/staff/generate_staff_roll.py \
-		--inject-har $(EXPORT_USRDIR)/game/staff.har
+# Deprecated compatibility target. export_resources already generates and
+# injects the translated staff roll into the rebuilt staff.har archive.
+inject_staff_roll: export_resources
+	@echo "Warning: inject_staff_roll is deprecated; use export_resources instead."
 
 export_eboot_trans:
 	@echo "Generating EBOOT translation binary..."

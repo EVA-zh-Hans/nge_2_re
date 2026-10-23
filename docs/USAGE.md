@@ -109,6 +109,7 @@
 2. 按需构建游戏资源：
 
    ```sh
+   make extract_iso
    make generate_memtalk_templates
    make export_resources
    make export_eboot_trans
