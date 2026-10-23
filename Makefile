@@ -1,21 +1,24 @@
 # ==========================================
 # Configuration & Path Definitions
 # ==========================================
-GAME_ID ?= 00064
-GAME_IDS := 00061 00064
+BASE_GAME_ID := 00064
+GAME_ID ?= $(BASE_GAME_ID)
+GAME_IDS := 00064 00061
 
 # Temporary and Build Directories
 TEMP_DIR        := temp
 DOWNLOAD_DIR    := $(TEMP_DIR)/downloads
 BUILD_DIR       := build
-EXPORT_GAME_DIR := $(BUILD_DIR)/ULJS00064/PSP_GAME
+EXPORT_DIR      := $(BUILD_DIR)/ULJS$(GAME_ID)
+EXPORT_GAME_DIR := $(EXPORT_DIR)/PSP_GAME
 EXPORT_BIN_DIR  := $(EXPORT_GAME_DIR)/USRDIR
 EXPORT_SYSDIR   := $(EXPORT_GAME_DIR)/SYSDIR
 EXPORT_USRDIR   := $(EXPORT_GAME_DIR)/USRDIR
 TOOLS_DIR       := $(BUILD_DIR)/tools
+BASE_EXPORT_DIR := $(BUILD_DIR)/ULJS$(BASE_GAME_ID)
 
 # Source Directories
-PSP_GAME_DIR    := $(TEMP_DIR)/ULJS00064/PSP_GAME
+PSP_GAME_DIR    := $(TEMP_DIR)/ULJS$(GAME_ID)/PSP_GAME
 USRDIR          := $(PSP_GAME_DIR)/USRDIR
 
 # Tool Commands
@@ -36,6 +39,7 @@ help:
 	@echo "  make export_resources    - Build translated resources on demand"
 	@echo "  make export_eboot_trans  - Generate the EBOOT translation binary"
 	@echo "  make gen_metadata        - Generate patch metadata (JSON and image)"
+	@echo "  make edit_sfo GAME_ID=id - Update the title in that ISO's PARAM.SFO"
 	@echo "  make patch_iso           - Create the patched ISO and xdelta"
 	@echo "  make patch_all_ids       - Generate patches for all GAME_IDS (00061 & 00064)"
 	@echo "  make full_build          - Run the complete pipeline"
@@ -134,8 +138,14 @@ pspdecrypt:
 # ==========================================
 
 extract_iso:
-	@echo "Extracting game files..."
-	$(UV_RUN) scripts/pack/unpack.py -o '$(TEMP_DIR)/ULJS00064' '$(TEMP_DIR)/ULJS00064.iso'
+	@if [ -f '$(PSP_GAME_DIR)/PARAM.SFO' ]; then \
+		echo "ISO already extracted for GAME_ID=$(GAME_ID)."; \
+	else \
+		echo "Extracting game files for GAME_ID=$(GAME_ID)..."; \
+		$(UV_RUN) scripts/pack/unpack.py \
+			-o '$(TEMP_DIR)/ULJS$(GAME_ID)' \
+			'$(TEMP_DIR)/ULJS$(GAME_ID).iso'; \
+	fi
 
 decrypt_eboot: pspdecrypt
 	@echo "Decrypting EBOOT..."
@@ -145,6 +155,13 @@ decrypt_eboot: pspdecrypt
 copy_font:
 	@echo "Copying font files..."
 	@cp resources/assets/fonts.pgf $(EXPORT_USRDIR)/fonts.pgf
+
+edit_sfo:
+	@echo "Editing PARAM.SFO for GAME_ID=$(GAME_ID)..."
+	@mkdir -p $(EXPORT_GAME_DIR)
+	$(UV_RUN) -m scripts.sfo \
+		--output '$(EXPORT_GAME_DIR)/PARAM.SFO' \
+		'$(PSP_GAME_DIR)/PARAM.SFO'
 
 # Timestamped output filenames to avoid overwriting previous builds
 TIMESTAMP := $(shell TZ=Asia/Shanghai date +%Y%m%d-%H%M%S)
@@ -161,13 +178,17 @@ gen_metadata:
 repack_iso:
 	@echo "Repacking game files into ISO..."
 	@mkdir -p $(BUILD_DIR)
-	$(UV_RUN) scripts/pack/repack_add.py '$(TEMP_DIR)/ULJS$(GAME_ID).iso' '$(PATCHED_ISO)' '$(BUILD_DIR)/ULJS00064'
+	$(UV_RUN) scripts/pack/repack_add.py '$(TEMP_DIR)/ULJS$(GAME_ID).iso' '$(PATCHED_ISO)' '$(EXPORT_DIR)'
 
 gen_xdelta:
 	@echo "Generating xdelta patch..."
 	xdelta3 -e -9 -S djw -f -s '$(TEMP_DIR)/ULJS$(GAME_ID).iso' '$(PATCHED_ISO)' '$(PATCH_XDELTA)'
 
-patch_iso: repack_iso gen_xdelta
+patch_iso:
+	$(MAKE) extract_iso GAME_ID=$(GAME_ID)
+	$(MAKE) edit_sfo GAME_ID=$(GAME_ID)
+	$(MAKE) repack_iso GAME_ID=$(GAME_ID) TIMESTAMP=$(TIMESTAMP)
+	$(MAKE) gen_xdelta GAME_ID=$(GAME_ID) TIMESTAMP=$(TIMESTAMP)
 
 # ==========================================
 # Meta Targets
@@ -196,12 +217,19 @@ rebuild:
 	$(MAKE) gen_metadata
 	$(MAKE) patch_all_ids
 
-# Build patches for all GAME_IDS
-patch_all_ids: $(addprefix patch_id_,$(GAME_IDS))
+# Clone the common 00064 overlay before the per-version SFO files are written.
+prepare_patch_dirs:
+	@for id in $(filter-out $(BASE_GAME_ID),$(GAME_IDS)); do \
+		rm -rf '$(BUILD_DIR)/ULJS'$$id; \
+		cp -R '$(BASE_EXPORT_DIR)' '$(BUILD_DIR)/ULJS'$$id; \
+	done
+
+patch_all_ids: prepare_patch_dirs
+	$(MAKE) -j$(words $(GAME_IDS)) $(addprefix patch_id_,$(GAME_IDS)) TIMESTAMP=$(TIMESTAMP)
 
 patch_id_%:
 	@echo "Generating patch for GAME_ID $*..."
-	$(MAKE) patch_iso GAME_ID=$*
+	$(MAKE) patch_iso GAME_ID=$* TIMESTAMP=$(TIMESTAMP)
 
 clean:
 	@echo "Cleaning build directory..."
@@ -216,5 +244,5 @@ clean:
 .PHONY: help download_trans generate_memtalk_templates check_trans \
         export_resources export_eboot_trans \
         plugin pgftool pspdecrypt \
-        extract_iso decrypt_eboot copy_font repack_iso gen_xdelta gen_metadata patch_iso \
-        full_build rebuild patch_all_ids patch_id_% clean
+        extract_iso decrypt_eboot copy_font edit_sfo repack_iso gen_xdelta gen_metadata patch_iso \
+        full_build rebuild prepare_patch_dirs patch_all_ids patch_id_% clean
