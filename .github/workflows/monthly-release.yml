@@ -1,0 +1,48 @@
+name: Monthly Release
+
+# Tags the latest main on the 26th of every month. The tag push triggers
+# build.yml (tags: v*), which builds the patches and publishes the release.
+on:
+  schedule:
+    # 26th of each month, 00:00 UTC
+    - cron: '0 0 26 * *'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create (default: vYYYY.MM.26 from today)'
+        required: false
+        type: string
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          submodules: false
+          # A PAT is required: tags pushed with GITHUB_TOKEN do not trigger
+          # other workflows (build.yml release job, Codeberg mirror).
+          token: ${{ secrets.GIT_PAT }}
+
+      - name: Create and push release tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="${INPUT_TAG:-v$(date -u +%Y.%m.26)}"
+
+          if git rev-parse -q --verify "refs/tags/$TAG" > /dev/null; then
+            echo "Tag $TAG already exists; nothing to do."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Monthly release $TAG"
+          git push origin "refs/tags/$TAG"
+          echo "Pushed $TAG"
