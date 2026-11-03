@@ -1,6 +1,7 @@
 name: Monthly Release
 
-# Tags the latest main on the 26th of every month. The tag push triggers
+# Tags the latest main on the 26th of every month, bumping the minor version
+# of the newest vX.Y.Z-beta.N tag (v2.2.0-beta.1 -> v2.3.0-beta.1). The tag push triggers
 # build.yml (tags: v*), which builds the patches and publishes the release.
 on:
   schedule:
@@ -9,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to create (default: vYYYY.MM.26 from today)'
+        description: 'Tag to create (default: latest tag with minor version + 1)'
         required: false
         type: string
 
@@ -34,7 +35,18 @@ jobs:
           INPUT_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          TAG="${INPUT_TAG:-v$(date -u +%Y.%m.26)}"
+          if [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          else
+            LATEST=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*-beta.*' --sort=-v:refname | head -n1)
+            test -n "$LATEST"
+            if [[ ! "$LATEST" =~ ^v([0-9]+)\.([0-9]+)\.[0-9]+(-.+)$ ]]; then
+              echo "Cannot parse latest tag: $LATEST" >&2
+              exit 1
+            fi
+            TAG="v${BASH_REMATCH[1]}.$((BASH_REMATCH[2] + 1)).0-beta.1"
+            echo "Latest tag $LATEST -> $TAG"
+          fi
 
           if git rev-parse -q --verify "refs/tags/$TAG" > /dev/null; then
             echo "Tag $TAG already exists; nothing to do."
