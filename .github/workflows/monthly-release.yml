@@ -1,0 +1,60 @@
+name: Monthly Release
+
+# Tags the latest main on the 26th of every month, bumping the minor version
+# of the newest vX.Y.Z-beta.N tag (v2.2.0-beta.1 -> v2.3.0-beta.1). The tag push triggers
+# build.yml (tags: v*), which builds the patches and publishes the release.
+on:
+  schedule:
+    # 26th of each month, 00:00 UTC
+    - cron: '0 0 26 * *'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create (default: latest tag with minor version + 1)'
+        required: false
+        type: string
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          submodules: false
+          # A PAT is required: tags pushed with GITHUB_TOKEN do not trigger
+          # other workflows (build.yml release job, Codeberg mirror).
+          token: ${{ secrets.GIT_PAT }}
+
+      - name: Create and push release tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          else
+            LATEST=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*-beta.*' --sort=-v:refname | head -n1)
+            test -n "$LATEST"
+            if [[ ! "$LATEST" =~ ^v([0-9]+)\.([0-9]+)\.[0-9]+(-.+)$ ]]; then
+              echo "Cannot parse latest tag: $LATEST" >&2
+              exit 1
+            fi
+            TAG="v${BASH_REMATCH[1]}.$((BASH_REMATCH[2] + 1)).0-beta.1"
+            echo "Latest tag $LATEST -> $TAG"
+          fi
+
+          if git rev-parse -q --verify "refs/tags/$TAG" > /dev/null; then
+            echo "Tag $TAG already exists; nothing to do."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Monthly release $TAG"
+          git push origin "refs/tags/$TAG"
+          echo "Pushed $TAG"
