@@ -126,9 +126,11 @@ class RetranslateTests(unittest.TestCase):
         self.assertTrue(any(issue["rule"] == "line_breaks" for issue in retranslate.validate_translation(source, matching.replace("\n", " "), ())))
 
     def test_chinese_punctuation_spacing_and_eva_glyph_rules(self):
-        source = "EVA Θ Α Τ Ν Σ Ｓ。\u200b"
-        matching = "EVAΘΑΤΝΣＳ。\u200b"
+        source = "EVA Θ Α Τ Ν Σ Ｓ。"
+        matching = "EVAΘΑΤΝΣＳ。"
         self.assertEqual([], retranslate.validate_translation(source, matching, ()))
+        # U+200B has no EVA SJIS encoding, so even a preserved one must be flagged.
+        self.assertIn("encoding", {issue["rule"] for issue in retranslate.validate_translation("A\u200b", "A\u200b", ())})
         invalid = retranslate.validate_translation("English", '中文 text... ~ - "quoted"', ())
         rules = {issue["rule"] for issue in invalid}
         self.assertTrue({"cjk_latin_spacing", "ellipsis_style", "fullwidth_tilde", "dash_style", "corner_quotes"}.issubset(rules))
