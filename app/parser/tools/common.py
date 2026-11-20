@@ -71,6 +71,18 @@ def from_eva_sjis(content):
 
     return content
 
+class EvaEncodeError(ValueError):
+    """Raised when a character has no Shift_JIS or custom EVA encoding."""
+
+    def __init__(self, char, text=None):
+        self.char = char
+        self.text = text
+        message = f"Cannot encode character {char!r} (U+{ord(char):04X}) to EVA SJIS"
+        if text is not None:
+            preview = text if len(text) <= 50 else text[:50] + "..."
+            message += f" in text: {preview!r}"
+        super().__init__(message)
+
 # ===== 性能优化：字符编码缓存机制 =====
 # 构建自定义字符映射字典（仅在模块加载时执行一次，避免每次编码时遍历列表）
 _CUSTOM_CHAR_MAP = {entry['char']: bytes.fromhex(entry['custom_code'][2:]) for entry in CUSTOM_ENCODE_MAP}
@@ -114,8 +126,9 @@ def _encode_char_cached(char):
         encoded_char = _CUSTOM_CHAR_MAP.get(char)
         if encoded_char is not None:
             return encoded_char
-        # FIXME: If no custom code is found, fallback to a placeholder character
-        return b'?'  # Fallback to a placeholder character
+        # Never substitute a placeholder: an unmapped character would ship as
+        # a visible '?' in game without anyone noticing.
+        raise EvaEncodeError(char)
 
 def to_eva_sjis(content):
     """
@@ -134,7 +147,10 @@ def to_eva_sjis(content):
     # We let most remain as regular ASCII
     #content = content.replace('N²', 'Ν')
     #content = content.replace('S²', 'Σ')
-    return b''.join(_encode_char_cached(char) for char in content)
+    try:
+        return b''.join(_encode_char_cached(char) for char in content)
+    except EvaEncodeError as exc:
+        raise EvaEncodeError(exc.char, content) from None
 
 def unique_color(index, total):
     if index == -1:
