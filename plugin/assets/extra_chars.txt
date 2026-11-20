@@ -1,0 +1,15 @@
+# Characters outside GB2312 that translations need.
+#
+# APPEND-ONLY: new characters get custom codes after the GB2312 block, in file
+# order. Never insert, delete or reorder lines: that shifts the codes of every
+# later character. Each line is a single character; '#' lines are comments.
+#
+# After editing, regenerate the PC-side table and the committed PSP table:
+#   uv run python plugin/scripts/gentable.py --out-bin /tmp/t.bin --out-map /tmp/t.json --out-py app/utils/map.py
+#   uv run python plugin/scripts/bin2c.py --symbol GB2312_CUSTOM_BIN /tmp/t.bin plugin/src/bin/gb2312.c
+# tests/unit/test_charset_table.py fails if either copy is out of date.
+#
+# The font (resources/assets/fonts.pgf) must also contain a glyph for each one.
+啰
+瘆
+窸

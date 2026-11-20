@@ -7477,4 +7477,7 @@ CUSTOM_ENCODE_MAP = [
     {"char": "鼽", "utf16_hex": "3d9f", "custom_code": "0xc36f"},
     {"char": "鼾", "utf16_hex": "3e9f", "custom_code": "0xc370"},
     {"char": "齄", "utf16_hex": "449f", "custom_code": "0xc371"},
+    {"char": "啰", "utf16_hex": "7055", "custom_code": "0xc372"},
+    {"char": "瘆", "utf16_hex": "0676", "custom_code": "0xc373"},
+    {"char": "窸", "utf16_hex": "b87a", "custom_code": "0xc374"},
 ]
