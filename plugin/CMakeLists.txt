@@ -14,7 +14,6 @@ set(LOADER_SOURCES
     src/loader/ui_draw.c
     src/loader/image_display.c
     src/bin/atlas.c
-    src/bin/atlas_palette.c
 )
 
 # Define runtime source files
@@ -54,7 +53,7 @@ add_prx_module(EBOOT ${LOADER_SOURCES} src/loader/exports_loader.exp)
 add_prx_module(EVA2RT ${RUNTIME_SOURCES} src/runtime/exports_runtime.exp)
 
 # Set compiler flags for C files only  
-target_compile_options(EBOOT PRIVATE -O2 -Wall)
+target_compile_options(EBOOT PRIVATE -O2 -G0 -Wall)
 target_compile_options(EVA2RT PRIVATE -O2 -G0 -Wall -fno-pic)
 string(TIMESTAMP BUILD_YEAR "%Y")
 target_compile_definitions(EBOOT PRIVATE BUILD_YEAR=${BUILD_YEAR})
@@ -69,10 +68,10 @@ set_property(SOURCE src/sceLibFont.S APPEND PROPERTY COMPILE_DEFINITIONS
 
 # Link all required libraries  
 target_link_libraries(EBOOT PRIVATE
-    pspgu
-    pspdisplay
-    pspctrl
-    pspge
+    pspdisplay_driver
+    pspctrl_driver
+    pspge_driver
+    pspkernel
 )
 
 target_link_libraries(EVA2RT PRIVATE
