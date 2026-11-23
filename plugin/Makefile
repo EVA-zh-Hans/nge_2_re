@@ -48,7 +48,7 @@ $(STAFF_ROLL_HEADER): $(STAFF_ROLL_GENERATOR) $(STAFF_ROLL_MANIFEST) \
 
 $(GB2312_BIN) $(GB2312_MAP): $(GB2312_STAMP)
 
-$(GB2312_STAMP): scripts/gentable.py
+$(GB2312_STAMP): scripts/gentable.py assets/extra_chars.txt
 	@mkdir -p $(GENERATED_DIR)
 	$(PYTHON) scripts/gentable.py --out-bin $(GB2312_BIN) --out-map $(GB2312_MAP)
 	@touch $@
