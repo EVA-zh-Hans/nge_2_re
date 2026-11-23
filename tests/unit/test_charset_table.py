@@ -59,16 +59,21 @@ class CharsetTableTests(unittest.TestCase):
         self.assertEqual(self.generated_c, committed)
 
     def test_extra_chars_follow_gb2312_block_in_file_order(self):
-        tail = [e["char"] for e in CUSTOM_ENCODE_MAP[-len(self.extra):]]
-        self.assertEqual(self.extra, tail)
-        for char in "啰瘆窸":
-            self.assertIn(char, self.extra)
+        gb2312_map = io.StringIO()
+        gentable.gb2312_to_custom(gb2312_map, [])
+        gb2312_entries = json.loads(gb2312_map.getvalue())
+        gb2312_chars = {e["char"] for e in gb2312_entries}
+        expected_tail = [c for c in self.extra if c not in gb2312_chars]
+        tail = [e["char"] for e in CUSTOM_ENCODE_MAP[len(gb2312_entries):]]
+        self.assertEqual(expected_tail, tail)
+        for char in "啰瘆窸窣":
+            self.assertIn(char, tail)
 
     def test_gb2312_block_codes_are_stable(self):
-        # Anchors from the original table: appending must never shift these.
+        # Anchors from the GB2312 block (avoiding 0x00, 0x0A, 0x25 low bytes).
         by_char = {e["char"]: e["custom_code"] for e in CUSTOM_ENCODE_MAP}
         self.assertEqual("0xa601", by_char["　"])
-        self.assertEqual("0xc371", by_char["齄"])
+        self.assertEqual("0xc38f", by_char["齄"])
 
     def test_codes_are_unique_in_range_and_avoid_reserved_bytes(self):
         codes = [int(e["custom_code"], 16) for e in CUSTOM_ENCODE_MAP]
@@ -76,7 +81,12 @@ class CharsetTableTests(unittest.TestCase):
         self.assertEqual(len(CUSTOM_ENCODE_MAP), len({e["char"] for e in CUSTOM_ENCODE_MAP}))
         for code in codes:
             self.assertTrue(CUSTOM_FIRST <= code <= CUSTOM_LAST, hex(code))
-            self.assertNotIn(code & 0xFF, (0x00, 0x25), hex(code))
+            self.assertNotIn(code & 0xFF, (0x00, 0x0A, 0x25), hex(code))
+        # Every reserved low-byte slot inside the table must be zero-padded.
+        entry_count = len(self.table) // 2
+        for index in range(entry_count):
+            if (index & 0xFF) in (0x00, 0x0A, 0x25):
+                self.assertEqual(b"\x00\x00", self.table[index * 2:index * 2 + 2], hex(CUSTOM_FIRST + index))
 
     def test_round_trip_char_to_code_to_table_to_char(self):
         for entry in CUSTOM_ENCODE_MAP:
@@ -99,30 +109,39 @@ class CharsetTableTests(unittest.TestCase):
                 expected = int(entry["custom_code"], 16).to_bytes(2, "big")
             self.assertEqual(expected, to_eva_sjis(char), entry)
 
-        # The characters this table was extended for.
-        for char, code in (("啰", 0xC372), ("瘆", 0xC373), ("窸", 0xC374)):
+        # Standard-table extras and previously 0x0A-colliding characters.
+        by_char = {e["char"]: int(e["custom_code"], 16) for e in CUSTOM_ENCODE_MAP}
+        for char in ("啰", "瘆", "窣", "窸", "搞", "频"):
+            code = by_char[char]
+            self.assertNotIn(code & 0xFF, (0x00, 0x0A, 0x25))
             self.assertEqual(code.to_bytes(2, "big"), to_eva_sjis(char))
 
     def test_table_length_in_c_header_matches_data(self):
         match = re.search(r"GB2312_CUSTOM_BIN_len = (\d+);", self.generated_c)
         self.assertEqual(len(self.table), int(match.group(1)))
 
-    def test_extra_chars_loader_rejects_bad_input(self):
+    def test_extra_chars_loader_filters_and_rejects_bad_input(self):
         def load(text):
             with tempfile.TemporaryDirectory() as d:
                 path = Path(d) / "extra.txt"
                 path.write_text(text, encoding="utf-8")
                 return gentable.load_extra_chars(path)
 
-        self.assertEqual(["啰"], load("# comment\n\n啰\n"))
+        # Comments, blank lines, duplicates, Shift_JIS, and non-BMP chars are skipped.
+        self.assertEqual(["啰", "窣"], load("# comment\n\n啰\n啰\nあ\n𠀀\n窣\n"))
         with self.assertRaises(ValueError):
             load("啰瘆\n")  # two characters on one line
+
+        # gb2312_to_custom deduplicates GB2312 and repeated extra chars.
+        buf = io.StringIO()
+        gentable.gb2312_to_custom(buf, ["中", "啰", "啰"])
+        entries = json.loads(buf.getvalue())
+        self.assertEqual(1, sum(1 for e in entries if e["char"] == "中"))
+        self.assertEqual(1, sum(1 for e in entries if e["char"] == "啰"))
+
+        # Direct non-BMP input must never slip into the 16-bit table.
         with self.assertRaises(ValueError):
-            load("啰\n啰\n")  # duplicate
-        with self.assertRaises(ValueError):
-            load("あ\n")  # already Shift_JIS encodable
-        with self.assertRaises(ValueError):
-            gentable.gb2312_to_custom(io.StringIO(), ["中"])  # already in GB2312 block
+            gentable.gb2312_to_custom(io.StringIO(), ["𠀀"])
 
 
 if __name__ == "__main__":
