@@ -3,8 +3,16 @@
 
 #include <stdint.h>
 
-// 核心：支持 UTF-8 的打印函数
-void uiPrint(float x, float y, const char* str, uint32_t color);
-int uiTextWidth(const char* str);
+// Render UTF-8 text directly into an ABGR8888 framebuffer in VRAM.
+void uiPrint(
+    uint32_t *framebuffer,
+    int buffer_stride,
+    int screen_width,
+    int screen_height,
+    int x,
+    int y,
+    const char *str,
+    uint32_t color);
+int uiTextWidth(const char *str);
 
 #endif

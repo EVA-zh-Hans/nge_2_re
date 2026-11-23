@@ -2,17 +2,15 @@ TARGET = EBOOT
 ATTR = BIN
 
 OBJS = src/loader/loader.o src/loader/ui_draw.o src/loader/image_display.o\
- src/bin/atlas.o src/bin/atlas_palette.o
+ src/loader/ModuleMgrForKernel.o src/loader/KUBridge.o\
+ src/bin/atlas.o
 
 BUILD_YEAR := $(shell date +%Y)
-CFLAGS = -O2 -Wall -DBUILD_YEAR=$(BUILD_YEAR)
+CFLAGS = -O2 -G0 -Wall -DBUILD_YEAR=$(BUILD_YEAR)
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 LDFLAGS = -nostartfiles
 
-# Define PSP import function flags
-ASFLAGS = -DF_sceLibFont_0000 -DF_sceLibFont_0003 -DF_sceLibFont_0014 -DF_sceLibFont_0017
-
-LIBS = -lpspgu
+LIBS =
 
 INCDIR = include
 
