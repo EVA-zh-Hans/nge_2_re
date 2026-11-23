@@ -12,16 +12,14 @@
 #include "image_display.h"
 
 /*
- * Run the loader in kernel partition (PSP_MODULE_KERNEL) so it does not occupy
- * user memory at 0x08804000. The original game BOOT.BIN is then loaded into
- * user memory via sceKernelLoadModuleDisc at its standard 0x08804000 base,
- * followed by the user-mode EVA2RT.PRX runtime plugin via kuKernelLoadModule.
+ * Run the loader as a pure kernel module (PSP_MODULE_KERNEL + USE_KERNEL_LIBS)
+ * so it lives in kernel memory and never occupies user memory at 0x08804000.
+ * BOOT.BIN and EVA2RT.PRX are both user-mode PRXs loaded via
+ * ModuleMgrForKernel::sceKernelLoadModule, so BOOT.BIN lands at 0x08804000
+ * with zero base-address shift.
  */
 PSP_MODULE_INFO("EBOOT_LOADER", PSP_MODULE_KERNEL, 1, 1);
 PSP_NO_CREATE_MAIN_THREAD();
-
-SceUID sceKernelLoadModuleDisc(const char *path, int flags, SceKernelLMOption *option);
-SceUID kuKernelLoadModule(const char *path, int flags, SceKernelLMOption *option);
 
 #define BUFFER_WIDTH 512
 #define BUFFER_HEIGHT 272
@@ -203,10 +201,10 @@ static int main_thread(SceSize args, void *argp)
     displaySplashImage("disc0:/PSP_GAME/USRDIR/metadata.raw", 480, 272, 5000);
     clearDisplayForGame();
 
-    SceUID eboot_mid = sceKernelLoadModuleDisc(PathOldBoot, 0, NULL);
+    SceUID eboot_mid = sceKernelLoadModule(PathOldBoot, 0, NULL);
     if (eboot_mid >= 0) {
         int status = 0;
-        SceUID runtime_mid = kuKernelLoadModule(PathRuntime, 0, NULL);
+        SceUID runtime_mid = sceKernelLoadModule(PathRuntime, 0, NULL);
         Eva2RuntimeStartArgs runtime_args;
         runtime_args.boot_mid = eboot_mid;
         runtime_args.flags = 0;

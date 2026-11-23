@@ -2,7 +2,6 @@ TARGET = EBOOT
 ATTR = BIN
 
 OBJS = src/loader/loader.o src/loader/ui_draw.o src/loader/image_display.o\
- src/loader/ModuleMgrForKernel.o src/loader/KUBridge.o\
  src/bin/atlas.o
 
 BUILD_YEAR := $(shell date +%Y)
@@ -10,7 +9,9 @@ CFLAGS = -O2 -G0 -Wall -DBUILD_YEAR=$(BUILD_YEAR)
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 LDFLAGS = -nostartfiles
 
-LIBS =
+USE_KERNEL_LIBC = 1
+USE_KERNEL_LIBS = 1
+LIBS = -lpspge_driver
 
 INCDIR = include
 

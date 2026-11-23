@@ -13,8 +13,6 @@ set(LOADER_SOURCES
     src/loader/loader.c
     src/loader/ui_draw.c
     src/loader/image_display.c
-    src/loader/ModuleMgrForKernel.S
-    src/loader/KUBridge.S
     src/bin/atlas.c
 )
 
@@ -70,9 +68,10 @@ set_property(SOURCE src/sceLibFont.S APPEND PROPERTY COMPILE_DEFINITIONS
 
 # Link all required libraries  
 target_link_libraries(EBOOT PRIVATE
-    pspdisplay
-    pspctrl
-    pspge
+    pspdisplay_driver
+    pspctrl_driver
+    pspge_driver
+    pspkernel
 )
 
 target_link_libraries(EVA2RT PRIVATE
